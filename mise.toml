@@ -1,0 +1,7 @@
+[tasks.build]
+description = "Build Scamp and publish /Scamp.app"
+run = "./scripts/build-macos.sh"
+
+[tasks.start]
+description = "Stop running app, clean old builds, rebuild, copy to root, and launch"
+run = "./scripts/start.sh"

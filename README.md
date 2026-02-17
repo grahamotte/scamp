@@ -4,23 +4,30 @@ Minimal native macOS music player prototype.
 
 ## Standard macOS App Build
 
-Build the app target:
+Build and publish `Scamp.app` at the repo root:
 
 ```bash
-./scripts/build-macos.sh
+mise build
 ```
 
-Open the app:
+Build fresh and launch:
 
 ```bash
-./scripts/open-macos.sh
+mise start
 ```
 
 After build, a convenient copy is available at:
 
 ```bash
-/Users/grahamotte/src/scamp/Scamp.app
+./Scamp.app
 ```
+
+`mise start` will:
+- stop any running `Scamp` process
+- remove root app bundles (`Scamp.app` and legacy `Sampt.app`)
+- clear derived build output
+- build fresh and publish to `/Users/grahamotte/src/scamp/Scamp.app`
+- launch the app
 
 If `project.yml` changes, regenerate the project:
 
@@ -36,6 +43,6 @@ Use pinned tool versions from version-controlled files:
 ```bash
 mise trust
 mise install
-mise run build
-mise run open
+mise build
+mise start
 ```
