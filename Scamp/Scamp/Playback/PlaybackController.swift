@@ -9,6 +9,7 @@ final class PlaybackController: ObservableObject {
     @Published private(set) var isPlaying = false
     @Published private(set) var turntableSpeed: Double = 0
     @Published private(set) var albumArtImage: NSImage?
+    @Published private(set) var playlistProgress: Double = 0
 
     private static let spinUpDuration: TimeInterval = 1.6
     private static let spinDownDuration: TimeInterval = 2.0
@@ -17,6 +18,7 @@ final class PlaybackController: ObservableObject {
     private static let playbackRateCurveExponent: Double = 1.9
     private static let playbackVolumeCurveExponent: Double = 0.8
     private static let rampFrameNanoseconds: UInt64 = 16_666_667
+    private static let progressFrameNanoseconds: UInt64 = 16_666_667
     private static let movingThreshold: Double = 0.001
 
     private enum SpinDownAction {
@@ -29,6 +31,7 @@ final class PlaybackController: ObservableObject {
     private let engine: AudioPlayerEngine
     private var securityScopedFolderURL: URL?
     private var spinRampTask: Task<Void, Never>?
+    private var progressTask: Task<Void, Never>?
     private var pendingSpinDownAction: SpinDownAction = .none
 
     init(loader: PlaylistLoader, engine: AudioPlayerEngine) {
@@ -43,6 +46,7 @@ final class PlaybackController: ObservableObject {
 
     deinit {
         spinRampTask?.cancel()
+        progressTask?.cancel()
 
         if let folderURL = securityScopedFolderURL {
             folderURL.stopAccessingSecurityScopedResource()
@@ -76,7 +80,7 @@ final class PlaybackController: ObservableObject {
         }
     }
 
-    var playlistProgress: Double {
+    private var measuredPlaylistProgress: Double {
         guard
             let currentIndex,
             !playlist.isEmpty
@@ -142,6 +146,8 @@ final class PlaybackController: ObservableObject {
                     volume: playbackVolume(for: turntableSpeed)
                 )
                 isPlaying = true
+                syncProgressTask()
+                updatePlaylistProgress(allowBackwardJump: true)
                 if !isTurntableMoving {
                     setTurntableSpeed(0)
                 }
@@ -193,10 +199,12 @@ final class PlaybackController: ObservableObject {
             cancelSpinRamp()
             pendingSpinDownAction = .none
             isPlaying = true
+            syncProgressTask()
             engine.resume(
                 rate: playbackRate(for: turntableSpeed),
                 volume: playbackVolume(for: turntableSpeed)
             )
+            updatePlaylistProgress(allowBackwardJump: true)
             if !isTurntableMoving {
                 setTurntableSpeed(0)
             }
@@ -269,6 +277,7 @@ final class PlaybackController: ObservableObject {
             let tracks = try loader.loadTracks(from: folderURL)
             playlist = tracks
             currentIndex = tracks.isEmpty ? nil : 0
+            updatePlaylistProgress(allowBackwardJump: true)
 
             if let artworkURL = try? loader.loadFirstArtworkURL(from: folderURL) {
                 albumArtImage = NSImage(contentsOf: artworkURL)
@@ -277,6 +286,7 @@ final class PlaybackController: ObservableObject {
             playlist = []
             currentIndex = nil
             albumArtImage = nil
+            updatePlaylistProgress(allowBackwardJump: true)
         }
     }
 
@@ -315,10 +325,12 @@ final class PlaybackController: ObservableObject {
         engine.stop()
         isPlaying = false
         setTurntableSpeed(0)
+        syncProgressTask()
 
         if clearSelection {
             currentIndex = nil
         }
+        updatePlaylistProgress(allowBackwardJump: true)
     }
 
     private func startTrack(
@@ -345,6 +357,8 @@ final class PlaybackController: ObservableObject {
             }
             currentIndex = index
             isPlaying = true
+            syncProgressTask()
+            updatePlaylistProgress(allowBackwardJump: true)
             if shouldRampFromRest {
                 setTurntableSpeed(0)
                 rampTurntable(to: 1, duration: Self.spinUpDuration, completionAction: .none)
@@ -360,6 +374,8 @@ final class PlaybackController: ObservableObject {
         } catch {
             isPlaying = false
             setTurntableSpeed(0)
+            syncProgressTask()
+            updatePlaylistProgress(allowBackwardJump: true)
         }
     }
 
@@ -382,6 +398,8 @@ final class PlaybackController: ObservableObject {
         guard engine.hasLoadedTrack else {
             isPlaying = false
             setTurntableSpeed(0)
+            syncProgressTask()
+            updatePlaylistProgress(allowBackwardJump: true)
             return
         }
 
@@ -447,12 +465,16 @@ final class PlaybackController: ObservableObject {
         case .pause:
             engine.pause()
             isPlaying = false
+            syncProgressTask()
+            updatePlaylistProgress(allowBackwardJump: true)
         case let .stop(clearSelection):
             engine.stop()
             isPlaying = false
             if clearSelection {
                 currentIndex = nil
             }
+            syncProgressTask()
+            updatePlaylistProgress(allowBackwardJump: true)
         }
     }
 
@@ -468,6 +490,42 @@ final class PlaybackController: ObservableObject {
         guard isPlaying, engine.hasLoadedTrack else { return }
         engine.setPlaybackRate(playbackRate(for: clampedSpeed))
         engine.setPlaybackVolume(playbackVolume(for: clampedSpeed))
+    }
+
+    private func updatePlaylistProgress(allowBackwardJump: Bool = false) {
+        let measuredProgress = measuredPlaylistProgress
+        if allowBackwardJump || measuredProgress >= playlistProgress {
+            playlistProgress = measuredProgress
+        }
+    }
+
+    private func syncProgressTask() {
+        if isPlaying, engine.hasLoadedTrack {
+            startProgressTaskIfNeeded()
+            return
+        }
+        cancelProgressTask()
+    }
+
+    private func startProgressTaskIfNeeded() {
+        guard progressTask == nil else { return }
+
+        progressTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            while !Task.isCancelled {
+                self.updatePlaylistProgress()
+                do {
+                    try await Task.sleep(nanoseconds: Self.progressFrameNanoseconds)
+                } catch {
+                    return
+                }
+            }
+        }
+    }
+
+    private func cancelProgressTask() {
+        progressTask?.cancel()
+        progressTask = nil
     }
 
     private func playbackRate(for normalizedSpeed: Double) -> Float {
