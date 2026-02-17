@@ -10,10 +10,12 @@ final class PlaybackController: ObservableObject {
     @Published private(set) var turntableSpeed: Double = 0
     @Published private(set) var albumArtImage: NSImage?
 
-    private static let spinUpDuration: TimeInterval = 0.8
-    private static let spinDownDuration: TimeInterval = 1.0
-    private static let spinRecoveryDuration: TimeInterval = 0.4
-    private static let minimumPlaybackRate: Double = 0.58
+    private static let spinUpDuration: TimeInterval = 1.6
+    private static let spinDownDuration: TimeInterval = 2.0
+    private static let spinRecoveryDuration: TimeInterval = 0.8
+    private static let minimumPlaybackRate: Double = 0.5
+    private static let playbackRateCurveExponent: Double = 1.9
+    private static let playbackVolumeCurveExponent: Double = 0.8
     private static let rampFrameNanoseconds: UInt64 = 16_666_667
     private static let movingThreshold: Double = 0.001
 
@@ -470,14 +472,15 @@ final class PlaybackController: ObservableObject {
 
     private func playbackRate(for normalizedSpeed: Double) -> Float {
         let clampedSpeed = min(max(normalizedSpeed, 0), 1)
-        let rate = Self.minimumPlaybackRate + ((1 - Self.minimumPlaybackRate) * clampedSpeed)
+        let curvedSpeed = pow(clampedSpeed, Self.playbackRateCurveExponent)
+        let rate = Self.minimumPlaybackRate + ((1 - Self.minimumPlaybackRate) * curvedSpeed)
         return Float(rate)
     }
 
     private func playbackVolume(for normalizedSpeed: Double) -> Float {
         let clampedSpeed = min(max(normalizedSpeed, 0), 1)
-        // Keep loudness tied to platter speed so spin-up/down sounds physically connected.
-        let loudness = clampedSpeed * clampedSpeed
+        // Keep audio present longer at low speeds so pitch/rate stretch is clearly audible.
+        let loudness = pow(clampedSpeed, Self.playbackVolumeCurveExponent)
         return Float(loudness)
     }
 
