@@ -6,6 +6,7 @@ struct RecordAreaPlaceholderView: View {
 
     private static let platterRPM: Double = 33
     private let layout = VinylRecordLayout()
+    private let bufferBandColor = Color(white: 0.11)
 
     @State private var rotationAnchorDate: Date?
     @State private var persistedRotationDegrees: Double = 0
@@ -57,7 +58,7 @@ struct RecordAreaPlaceholderView: View {
 
             Circle()
                 .stroke(
-                    Color.pink.opacity(0.72),
+                    bufferBandColor,
                     style: StrokeStyle(lineWidth: max(1, geometry.outerBufferWidth))
                 )
                 .frame(
@@ -89,7 +90,7 @@ struct RecordAreaPlaceholderView: View {
 
             Circle()
                 .stroke(
-                    Color.pink.opacity(0.72),
+                    bufferBandColor,
                     style: StrokeStyle(lineWidth: max(1, geometry.innerBufferWidth))
                 )
                 .frame(
@@ -106,10 +107,12 @@ struct RecordAreaPlaceholderView: View {
                     )
                 )
                 .frame(width: geometry.labelRadius * 2, height: geometry.labelRadius * 2)
-                .overlay(
-                    Circle()
-                        .stroke(Color.white.opacity(0.42), lineWidth: max(1, size * 0.0025))
-                )
+                .overlay {
+                    if playback.albumArtImage == nil {
+                        Circle()
+                            .stroke(Color.white.opacity(0.42), lineWidth: max(1, size * 0.0025))
+                    }
+                }
                 .overlay {
                     if let albumArtImage = playback.albumArtImage {
                         Image(nsImage: albumArtImage)
@@ -207,10 +210,10 @@ struct RecordAreaPlaceholderView: View {
 }
 
 struct VinylRecordLayout {
-    var outerBufferFraction: CGFloat = 0.05
+    var outerBufferFraction: CGFloat = 0.03
     var trackBandFraction: CGFloat = 0.60
-    var innerBufferFraction: CGFloat = 0.05
-    var labelFraction: CGFloat = 0.30
+    var innerBufferFraction: CGFloat = 0.03
+    var labelFraction: CGFloat = 0.34
 
     // Normalized radius bounds used by track area and future tonearm travel constraints.
     var normalizedTrackBandBounds: ClosedRange<CGFloat> {
