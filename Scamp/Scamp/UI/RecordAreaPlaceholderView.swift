@@ -5,6 +5,7 @@ struct RecordAreaPlaceholderView: View {
     @ObservedObject var playback: PlaybackController
 
     private static let platterRPM: Double = 33
+    private static let scrubGuideAngleDegrees: Double = -65
     private let layout = VinylRecordLayout()
     private let bufferBandColor = Color(white: 0.11)
 
@@ -12,13 +13,21 @@ struct RecordAreaPlaceholderView: View {
     @State private var persistedRotationDegrees: Double = 0
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: !playback.isPlaying)) { context in
-            let geometry = layout.resolved(forDiameter: size)
-            let rotationDegrees = rotationDegrees(at: context.date)
+        let geometry = layout.resolved(forDiameter: size)
 
-            recordSurface(for: geometry)
-            .frame(width: size, height: size)
-            .rotationEffect(.degrees(rotationDegrees))
+        ZStack {
+            TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: !playback.isPlaying)) { context in
+                let rotationDegrees = rotationDegrees(at: context.date)
+
+                recordSurface(for: geometry)
+                    .frame(width: size, height: size)
+                    .rotationEffect(.degrees(rotationDegrees))
+            }
+
+            if playback.hasPlaylist {
+                playlistScrubGuide(for: geometry)
+                    .frame(width: size, height: size)
+            }
         }
         .frame(width: size, height: size)
         .onAppear {
@@ -181,6 +190,45 @@ struct RecordAreaPlaceholderView: View {
             let fraction = min(max(elapsed / totalDuration, 0), 1)
             return geometry.trackBandRadiusBounds.upperBound - (trackBandWidth * CGFloat(fraction))
         }
+    }
+
+    private func playlistScrubGuide(for geometry: VinylRecordGeometry) -> some View {
+        let direction = scrubGuideDirection()
+        let center = CGPoint(x: size / 2, y: size / 2)
+        let start = CGPoint(
+            x: center.x + (direction.x * geometry.trackBandInnerRadius),
+            y: center.y + (direction.y * geometry.trackBandInnerRadius)
+        )
+        let end = CGPoint(
+            x: center.x + (direction.x * geometry.trackBandOuterRadius),
+            y: center.y + (direction.y * geometry.trackBandOuterRadius)
+        )
+        let lineWidth = max(1, size * 0.003)
+        let dotDiameter = max(3, size * 0.012)
+
+        return ZStack {
+            Path { path in
+                path.move(to: start)
+                path.addLine(to: end)
+            }
+            .stroke(Color.red, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+
+            Circle()
+                .fill(Color.red)
+                .frame(width: dotDiameter, height: dotDiameter)
+                .position(start)
+
+            Circle()
+                .fill(Color.red)
+                .frame(width: dotDiameter, height: dotDiameter)
+                .position(end)
+        }
+    }
+
+    private func scrubGuideDirection() -> CGPoint {
+        let radians = Self.scrubGuideAngleDegrees * .pi / 180
+        // SwiftUI's Y axis grows downward, so invert sine to preserve unit-circle angle semantics.
+        return CGPoint(x: cos(radians), y: -sin(radians))
     }
 
     private func syncRotationState(isPlaying: Bool, now: Date) {
