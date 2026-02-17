@@ -7,11 +7,27 @@ final class PlaybackController: ObservableObject {
     @Published private(set) var playlist: [PlaybackTrack] = []
     @Published private(set) var currentIndex: Int?
     @Published private(set) var isPlaying = false
+    @Published private(set) var turntableSpeed: Double = 0
     @Published private(set) var albumArtImage: NSImage?
+
+    private static let spinUpDuration: TimeInterval = 0.8
+    private static let spinDownDuration: TimeInterval = 1.0
+    private static let spinRecoveryDuration: TimeInterval = 0.4
+    private static let minimumPlaybackRate: Double = 0.58
+    private static let rampFrameNanoseconds: UInt64 = 16_666_667
+    private static let movingThreshold: Double = 0.001
+
+    private enum SpinDownAction {
+        case none
+        case pause
+        case stop(clearSelection: Bool)
+    }
 
     private let loader: PlaylistLoader
     private let engine: AudioPlayerEngine
     private var securityScopedFolderURL: URL?
+    private var spinRampTask: Task<Void, Never>?
+    private var pendingSpinDownAction: SpinDownAction = .none
 
     init(loader: PlaylistLoader, engine: AudioPlayerEngine) {
         self.loader = loader
@@ -24,6 +40,8 @@ final class PlaybackController: ObservableObject {
     }
 
     deinit {
+        spinRampTask?.cancel()
+
         if let folderURL = securityScopedFolderURL {
             folderURL.stopAccessingSecurityScopedResource()
         }
@@ -84,7 +102,10 @@ final class PlaybackController: ObservableObject {
         let clamped = min(max(progress, 0), 1)
         let maxIndex = playlist.count - 1
         let targetIndex = Int(round(clamped * Double(maxIndex)))
-        startTrack(at: targetIndex)
+        startTrack(
+            at: targetIndex,
+            preserveMomentum: isPlaying || isTurntableMoving
+        )
     }
 
     func seek(toPlaylistProgress progress: Double) {
@@ -111,11 +132,24 @@ final class PlaybackController: ObservableObject {
 
             let offsetInTrack = min(max(targetElapsed - elapsed, 0), max(duration - 0.001, 0))
             if currentIndex == index, engine.hasLoadedTrack {
+                cancelSpinRamp()
+                pendingSpinDownAction = .none
                 engine.seek(to: offsetInTrack)
-                engine.resume()
+                engine.resume(
+                    rate: playbackRate(for: turntableSpeed),
+                    volume: playbackVolume(for: turntableSpeed)
+                )
                 isPlaying = true
+                if !isTurntableMoving {
+                    setTurntableSpeed(0)
+                }
+                rampTurntable(to: 1, duration: Self.spinUpDuration, completionAction: .none)
             } else {
-                startTrack(at: index, startTime: offsetInTrack)
+                startTrack(
+                    at: index,
+                    startTime: offsetInTrack,
+                    preserveMomentum: isPlaying || isTurntableMoving
+                )
             }
             return
         }
@@ -140,18 +174,35 @@ final class PlaybackController: ObservableObject {
         guard !playlist.isEmpty else { return }
 
         if isPlaying {
-            engine.pause()
-            isPlaying = false
+            if isSpinDownPendingPause {
+                pendingSpinDownAction = .none
+                rampTurntable(
+                    to: 1,
+                    duration: Self.spinRecoveryDuration,
+                    completionAction: .none
+                )
+            } else {
+                pauseWithSpinDown()
+            }
             return
         }
 
         if engine.hasLoadedTrack {
-            engine.resume()
+            cancelSpinRamp()
+            pendingSpinDownAction = .none
             isPlaying = true
+            engine.resume(
+                rate: playbackRate(for: turntableSpeed),
+                volume: playbackVolume(for: turntableSpeed)
+            )
+            if !isTurntableMoving {
+                setTurntableSpeed(0)
+            }
+            rampTurntable(to: 1, duration: Self.spinUpDuration, completionAction: .none)
             return
         }
 
-        startTrack(at: currentIndex ?? 0)
+        startTrack(at: currentIndex ?? 0, preserveMomentum: false)
     }
 
     func playNext() {
@@ -165,7 +216,10 @@ final class PlaybackController: ObservableObject {
         }
 
         guard playlist.indices.contains(nextIndex) else { return }
-        startTrack(at: nextIndex)
+        startTrack(
+            at: nextIndex,
+            preserveMomentum: isPlaying || isTurntableMoving
+        )
     }
 
     func playPrevious() {
@@ -179,7 +233,10 @@ final class PlaybackController: ObservableObject {
         }
 
         guard playlist.indices.contains(previousIndex) else { return }
-        startTrack(at: previousIndex)
+        startTrack(
+            at: previousIndex,
+            preserveMomentum: isPlaying || isTurntableMoving
+        )
     }
 
     private func bindAudioEngineCallbacks() {
@@ -189,20 +246,20 @@ final class PlaybackController: ObservableObject {
                 if success {
                     self.playNextAfterCurrentTrackFinished()
                 } else {
-                    self.stopPlayback(clearSelection: true)
+                    self.stopPlayback(clearSelection: true, withSpinDown: false)
                 }
             }
         }
 
         engine.onDecodeError = { [weak self] in
             Task { @MainActor [weak self] in
-                self?.stopPlayback(clearSelection: true)
+                self?.stopPlayback(clearSelection: true, withSpinDown: false)
             }
         }
     }
 
     private func loadPlaylist(from folderURL: URL) {
-        stopPlayback(clearSelection: true)
+        stopPlayback(clearSelection: true, withSpinDown: false)
         albumArtImage = nil
         beginSecurityScopedAccess(for: folderURL)
 
@@ -232,47 +289,215 @@ final class PlaybackController: ObservableObject {
         }
     }
 
-    private func stopPlayback(clearSelection: Bool) {
+    private func stopPlayback(clearSelection: Bool, withSpinDown: Bool) {
+        guard !withSpinDown else {
+            guard isPlaying, engine.hasLoadedTrack else {
+                finishStopPlayback(clearSelection: clearSelection)
+                return
+            }
+
+            rampTurntable(
+                to: 0,
+                duration: Self.spinDownDuration,
+                completionAction: .stop(clearSelection: clearSelection)
+            )
+            return
+        }
+
+        finishStopPlayback(clearSelection: clearSelection)
+    }
+
+    private func finishStopPlayback(clearSelection: Bool) {
+        cancelSpinRamp()
+        pendingSpinDownAction = .none
         engine.stop()
         isPlaying = false
+        setTurntableSpeed(0)
 
         if clearSelection {
             currentIndex = nil
         }
     }
 
-    private func startTrack(at index: Int, startTime: TimeInterval = 0) {
+    private func startTrack(
+        at index: Int,
+        startTime: TimeInterval = 0,
+        preserveMomentum: Bool
+    ) {
         guard playlist.indices.contains(index) else {
-            stopPlayback(clearSelection: true)
+            stopPlayback(clearSelection: true, withSpinDown: false)
             return
         }
 
         let track = playlist[index]
+        let shouldRampFromRest = !preserveMomentum
+        let startRate = shouldRampFromRest ? playbackRate(for: 0) : 1
+        let startVolume = shouldRampFromRest ? playbackVolume(for: 0) : 1
 
         do {
-            try engine.play(url: track.url)
+            cancelSpinRamp()
+            pendingSpinDownAction = .none
+            try engine.play(url: track.url, rate: startRate, volume: startVolume)
             if startTime > 0 {
                 engine.seek(to: startTime)
             }
             currentIndex = index
             isPlaying = true
+            if shouldRampFromRest {
+                setTurntableSpeed(0)
+                rampTurntable(to: 1, duration: Self.spinUpDuration, completionAction: .none)
+            } else if turntableSpeed < 1 {
+                rampTurntable(
+                    to: 1,
+                    duration: Self.spinRecoveryDuration,
+                    completionAction: .none
+                )
+            } else {
+                setTurntableSpeed(1)
+            }
         } catch {
             isPlaying = false
+            setTurntableSpeed(0)
         }
     }
 
     private func playNextAfterCurrentTrackFinished() {
         guard let currentIndex else {
-            stopPlayback(clearSelection: true)
+            stopPlayback(clearSelection: true, withSpinDown: true)
             return
         }
 
         let nextIndex = currentIndex + 1
         guard playlist.indices.contains(nextIndex) else {
-            stopPlayback(clearSelection: true)
+            stopPlayback(clearSelection: true, withSpinDown: true)
             return
         }
 
-        startTrack(at: nextIndex)
+        startTrack(at: nextIndex, preserveMomentum: true)
+    }
+
+    private func pauseWithSpinDown() {
+        guard engine.hasLoadedTrack else {
+            isPlaying = false
+            setTurntableSpeed(0)
+            return
+        }
+
+        rampTurntable(
+            to: 0,
+            duration: Self.spinDownDuration,
+            completionAction: .pause
+        )
+    }
+
+    private func rampTurntable(
+        to targetSpeed: Double,
+        duration: TimeInterval,
+        completionAction: SpinDownAction
+    ) {
+        cancelSpinRamp()
+        pendingSpinDownAction = completionAction
+
+        let clampedTargetSpeed = min(max(targetSpeed, 0), 1)
+        let startingSpeed = min(max(turntableSpeed, 0), 1)
+
+        guard duration > 0 else {
+            setTurntableSpeed(clampedTargetSpeed)
+            completeSpinRamp()
+            return
+        }
+
+        spinRampTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+
+            let startDate = Date()
+            while !Task.isCancelled {
+                let elapsed = Date().timeIntervalSince(startDate)
+                let progress = min(max(elapsed / duration, 0), 1)
+                let easedProgress = self.easeInOut(progress)
+                let nextSpeed = startingSpeed + ((clampedTargetSpeed - startingSpeed) * easedProgress)
+                self.setTurntableSpeed(nextSpeed)
+
+                if progress >= 1 {
+                    break
+                }
+
+                do {
+                    try await Task.sleep(nanoseconds: Self.rampFrameNanoseconds)
+                } catch {
+                    return
+                }
+            }
+
+            self.setTurntableSpeed(clampedTargetSpeed)
+            self.completeSpinRamp()
+        }
+    }
+
+    private func completeSpinRamp() {
+        spinRampTask = nil
+        let completionAction = pendingSpinDownAction
+        pendingSpinDownAction = .none
+
+        switch completionAction {
+        case .none:
+            return
+        case .pause:
+            engine.pause()
+            isPlaying = false
+        case let .stop(clearSelection):
+            engine.stop()
+            isPlaying = false
+            if clearSelection {
+                currentIndex = nil
+            }
+        }
+    }
+
+    private func cancelSpinRamp() {
+        spinRampTask?.cancel()
+        spinRampTask = nil
+    }
+
+    private func setTurntableSpeed(_ speed: Double) {
+        let clampedSpeed = min(max(speed, 0), 1)
+        turntableSpeed = clampedSpeed
+
+        guard isPlaying, engine.hasLoadedTrack else { return }
+        engine.setPlaybackRate(playbackRate(for: clampedSpeed))
+        engine.setPlaybackVolume(playbackVolume(for: clampedSpeed))
+    }
+
+    private func playbackRate(for normalizedSpeed: Double) -> Float {
+        let clampedSpeed = min(max(normalizedSpeed, 0), 1)
+        let rate = Self.minimumPlaybackRate + ((1 - Self.minimumPlaybackRate) * clampedSpeed)
+        return Float(rate)
+    }
+
+    private func playbackVolume(for normalizedSpeed: Double) -> Float {
+        let clampedSpeed = min(max(normalizedSpeed, 0), 1)
+        // Keep loudness tied to platter speed so spin-up/down sounds physically connected.
+        let loudness = clampedSpeed * clampedSpeed
+        return Float(loudness)
+    }
+
+    private func easeInOut(_ progress: Double) -> Double {
+        if progress < 0.5 {
+            return 4 * progress * progress * progress
+        }
+
+        let shifted = (-2 * progress) + 2
+        return 1 - ((shifted * shifted * shifted) / 2)
+    }
+
+    private var isTurntableMoving: Bool {
+        turntableSpeed > Self.movingThreshold
+    }
+
+    private var isSpinDownPendingPause: Bool {
+        if case .pause = pendingSpinDownAction {
+            return true
+        }
+        return false
     }
 }

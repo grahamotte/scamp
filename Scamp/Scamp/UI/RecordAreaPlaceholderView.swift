@@ -10,13 +10,14 @@ struct RecordAreaPlaceholderView: View {
     private let bufferBandColor = Color(white: 0.11)
 
     @State private var rotationAnchorDate: Date?
+    @State private var anchoredTurntableSpeed: Double = 0
     @State private var persistedRotationDegrees: Double = 0
     @State private var scrubDragProgress: Double?
 
     var body: some View {
         let geometry = layout.resolved(forDiameter: size)
 
-        TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: !playback.isPlaying)) { context in
+        TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: playback.turntableSpeed <= 0.0001)) { context in
             let rotationDegrees = rotationDegrees(at: context.date)
             let scrubProgress = scrubDragProgress ?? playback.playlistProgress
 
@@ -33,12 +34,10 @@ struct RecordAreaPlaceholderView: View {
         }
         .frame(width: size, height: size)
         .onAppear {
-            if playback.isPlaying, rotationAnchorDate == nil {
-                rotationAnchorDate = Date()
-            }
+            syncRotationState(targetSpeed: playback.turntableSpeed, now: Date())
         }
-        .onChange(of: playback.isPlaying) { _, isPlaying in
-            syncRotationState(isPlaying: isPlaying, now: Date())
+        .onChange(of: playback.turntableSpeed) { _, speed in
+            syncRotationState(targetSpeed: speed, now: Date())
         }
     }
 
@@ -298,28 +297,24 @@ struct RecordAreaPlaceholderView: View {
         return CGPoint(x: cos(radians), y: -sin(radians))
     }
 
-    private func syncRotationState(isPlaying: Bool, now: Date) {
-        if isPlaying {
-            if rotationAnchorDate == nil {
-                rotationAnchorDate = now
-            }
-            return
-        }
-
-        if rotationAnchorDate != nil {
-            persistedRotationDegrees = rotationDegrees(at: now)
-            rotationAnchorDate = nil
-        }
+    private func syncRotationState(targetSpeed: Double, now: Date) {
+        persistedRotationDegrees = rotationDegrees(at: now)
+        let clampedSpeed = min(max(targetSpeed, 0), 1)
+        anchoredTurntableSpeed = clampedSpeed
+        rotationAnchorDate = clampedSpeed > 0 ? now : nil
     }
 
     private func rotationDegrees(at now: Date) -> Double {
         let wrappedPersistedDegrees = persistedRotationDegrees.truncatingRemainder(dividingBy: 360)
-        guard playback.isPlaying, let rotationAnchorDate else {
+        guard
+            let rotationAnchorDate,
+            anchoredTurntableSpeed > 0
+        else {
             return wrappedPersistedDegrees
         }
 
         let elapsed = max(0, now.timeIntervalSince(rotationAnchorDate))
-        let degreesPerSecond = (Self.platterRPM / 60) * 360
+        let degreesPerSecond = (Self.platterRPM / 60) * 360 * anchoredTurntableSpeed
         return (wrappedPersistedDegrees + (elapsed * degreesPerSecond)).truncatingRemainder(dividingBy: 360)
     }
 }
