@@ -17,6 +17,11 @@ struct ContentView: View {
     @Query private var items: [Item]
     
     @State private var columnVisibility: NavigationSplitViewVisibility = .detailOnly
+    @State private var nowPlayingTitle: String?
+
+    private var bottomBarTitle: String {
+        nowPlayingTitle ?? "SCAMP MICRO DECK"
+    }
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
@@ -38,7 +43,7 @@ struct ContentView: View {
                                 .frame(width: chromeInset)
 
                             ZStack {
-                                Color.black.opacity(0.16)
+                                Color.clear
 
                                 Text("Record Area")
                                     .font(.headline)
@@ -47,11 +52,11 @@ struct ContentView: View {
                             .frame(width: squareSize, height: squareSize)
                             .overlay(
                                 Rectangle()
-                                    .stroke(Color.white.opacity(0.25), lineWidth: 1)
+                                    .stroke(Color.white.opacity(0.5), lineWidth: 1)
                             )
 
                             ZStack {
-                                Color.white.opacity(0.08)
+                                Color.clear
 
                                 Text("Arm / Controls Area")
                                     .font(.headline)
@@ -60,12 +65,20 @@ struct ContentView: View {
                             .frame(width: controlsWidth, height: squareSize)
                             .overlay(
                                 Rectangle()
-                                    .stroke(Color.white.opacity(0.25), lineWidth: 1)
+                                    .stroke(Color.white.opacity(0.5), lineWidth: 1)
                             )
                         }
 
-                        Color.clear
-                            .frame(height: chromeInset)
+                        HStack {
+                            Spacer()
+                            Text(bottomBarTitle)
+                                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                .foregroundStyle(.white.opacity(0.86))
+                                .tracking(1.0)
+                        }
+                        .padding(.horizontal, 16)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: chromeInset)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 }
