@@ -25,7 +25,7 @@ struct DeckWorkspaceView: View {
                         Color.clear
                             .frame(width: chromeInset)
 
-                        RecordAreaPlaceholderView(size: squareSize)
+                        RecordAreaPlaceholderView(size: squareSize, playback: playback)
 
                         ControlsAreaView(
                             width: controlsWidth,

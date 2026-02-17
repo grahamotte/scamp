@@ -7,6 +7,7 @@ final class PlaybackController: ObservableObject {
     @Published private(set) var playlist: [PlaybackTrack] = []
     @Published private(set) var currentIndex: Int?
     @Published private(set) var isPlaying = false
+    @Published private(set) var albumArtImage: NSImage?
 
     private let loader: PlaylistLoader
     private let engine: AudioPlayerEngine
@@ -47,6 +48,12 @@ final class PlaybackController: ObservableObject {
             return nil
         }
         return playlist[currentIndex].displayName
+    }
+
+    var trackDurations: [TimeInterval] {
+        playlist.map { track in
+            max(track.duration, 1)
+        }
     }
 
     // Forward-looking API for arm scrubbing: map a normalized arm position to playlist index.
@@ -141,15 +148,21 @@ final class PlaybackController: ObservableObject {
 
     private func loadPlaylist(from folderURL: URL) {
         stopPlayback(clearSelection: true)
+        albumArtImage = nil
         beginSecurityScopedAccess(for: folderURL)
 
         do {
             let tracks = try loader.loadTracks(from: folderURL)
             playlist = tracks
             currentIndex = tracks.isEmpty ? nil : 0
+
+            if let artworkURL = try? loader.loadFirstArtworkURL(from: folderURL) {
+                albumArtImage = NSImage(contentsOf: artworkURL)
+            }
         } catch {
             playlist = []
             currentIndex = nil
+            albumArtImage = nil
         }
     }
 
