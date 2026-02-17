@@ -5,31 +5,23 @@ struct RecordAreaPlaceholderView: View {
     @ObservedObject var playback: PlaybackController
 
     private static let platterRPM: Double = 33
-    private static let scrubGuideAngleDegrees: Double = -65
     private let layout = VinylRecordLayout()
     private let bufferBandColor = Color(white: 0.11)
 
     @State private var rotationAnchorDate: Date?
     @State private var anchoredTurntableSpeed: Double = 0
     @State private var persistedRotationDegrees: Double = 0
-    @State private var scrubDragProgress: Double?
 
     var body: some View {
         let geometry = layout.resolved(forDiameter: size)
 
         TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: playback.turntableSpeed <= 0.0001)) { context in
             let rotationDegrees = rotationDegrees(at: context.date)
-            let scrubProgress = scrubDragProgress ?? playback.playlistProgress
 
             ZStack {
                 recordSurface(for: geometry)
                     .frame(width: size, height: size)
                     .rotationEffect(.degrees(rotationDegrees))
-
-                if playback.hasPlaylist {
-                    playlistScrubGuide(for: geometry, progress: scrubProgress)
-                        .frame(width: size, height: size)
-                }
             }
         }
         .frame(width: size, height: size)
@@ -191,110 +183,6 @@ struct RecordAreaPlaceholderView: View {
             let fraction = min(max(elapsed / totalDuration, 0), 1)
             return geometry.trackBandRadiusBounds.upperBound - (trackBandWidth * CGFloat(fraction))
         }
-    }
-
-    private func playlistScrubGuide(for geometry: VinylRecordGeometry, progress: Double) -> some View {
-        let direction = scrubGuideDirection()
-        let center = CGPoint(x: size / 2, y: size / 2)
-        let start = CGPoint(
-            x: center.x + (direction.x * geometry.trackBandOuterRadius),
-            y: center.y + (direction.y * geometry.trackBandOuterRadius)
-        )
-        let end = CGPoint(
-            x: center.x + (direction.x * geometry.trackBandInnerRadius),
-            y: center.y + (direction.y * geometry.trackBandInnerRadius)
-        )
-        let lineWidth = max(1, size * 0.003)
-        let dotDiameter = max(3, size * 0.012)
-        let handleDiameter = max(3, size * 0.009)
-        let clampedProgress = min(max(progress, 0), 1)
-        let handlePoint = pointOnScrubGuide(
-            for: clampedProgress,
-            start: start,
-            end: end
-        )
-        let dragTargetDiameter = max(18, handleDiameter * 2)
-
-        return ZStack {
-            Path { path in
-                path.move(to: start)
-                path.addLine(to: end)
-            }
-            .stroke(Color.red, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
-
-            Circle()
-                .fill(Color.red)
-                .frame(width: dotDiameter, height: dotDiameter)
-                .position(start)
-
-            Circle()
-                .fill(Color.red)
-                .frame(width: dotDiameter, height: dotDiameter)
-                .position(end)
-
-            Circle()
-                .fill(Color.clear)
-                .frame(width: dragTargetDiameter, height: dragTargetDiameter)
-                .overlay {
-                    Circle()
-                        .fill(Color.green)
-                        .frame(width: handleDiameter, height: handleDiameter)
-                }
-                .position(handlePoint)
-                .gesture(
-                    DragGesture(minimumDistance: 0)
-                        .onChanged { value in
-                            scrubDragProgress = projectedScrubProgress(
-                                for: value.location,
-                                start: start,
-                                end: end
-                            )
-                        }
-                        .onEnded { value in
-                            let targetProgress = projectedScrubProgress(
-                                for: value.location,
-                                start: start,
-                                end: end
-                            )
-                            scrubDragProgress = nil
-                            playback.seek(toPlaylistProgress: targetProgress)
-                        }
-                )
-        }
-    }
-
-    private func pointOnScrubGuide(
-        for progress: Double,
-        start: CGPoint,
-        end: CGPoint
-    ) -> CGPoint {
-        let t = min(max(progress, 0), 1)
-        return CGPoint(
-            x: start.x + ((end.x - start.x) * t),
-            y: start.y + ((end.y - start.y) * t)
-        )
-    }
-
-    private func projectedScrubProgress(
-        for location: CGPoint,
-        start: CGPoint,
-        end: CGPoint
-    ) -> Double {
-        let segmentDX = end.x - start.x
-        let segmentDY = end.y - start.y
-        let segmentLengthSquared = (segmentDX * segmentDX) + (segmentDY * segmentDY)
-        guard segmentLengthSquared > 0 else { return 0 }
-
-        let localX = location.x - start.x
-        let localY = location.y - start.y
-        let projection = ((localX * segmentDX) + (localY * segmentDY)) / segmentLengthSquared
-        return min(max(Double(projection), 0), 1)
-    }
-
-    private func scrubGuideDirection() -> CGPoint {
-        let radians = Self.scrubGuideAngleDegrees * .pi / 180
-        // SwiftUI's Y axis grows downward, so invert sine to preserve unit-circle angle semantics.
-        return CGPoint(x: cos(radians), y: -sin(radians))
     }
 
     private func syncRotationState(targetSpeed: Double, now: Date) {

@@ -13,12 +13,6 @@ struct ControlsAreaView: View {
             VStack(spacing: 0) {
                 Spacer()
 
-                Text("Arm / Controls Area")
-                    .font(.headline)
-                    .foregroundStyle(.white.opacity(0.9))
-
-                Spacer()
-
                 TransportControlsView(playback: playback)
                     .padding(.bottom, 14)
             }
