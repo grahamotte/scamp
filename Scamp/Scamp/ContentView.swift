@@ -7,20 +7,19 @@
 
 import AppKit
 import SwiftUI
-import SwiftData
 
 struct ContentView: View {
     private let windowWidth: CGFloat = 1100
     private let windowHeight: CGFloat = 720
 
-    @Environment(\.modelContext) private var modelContext
-    @Query private var items: [Item]
-    
+    @StateObject private var playback = PlaybackController()
     @State private var columnVisibility: NavigationSplitViewVisibility = .detailOnly
-    @State private var nowPlayingTitle: String?
 
     private var bottomBarTitle: String {
-        nowPlayingTitle ?? "SCAMP MICRO DECK"
+        if playback.isPlaying, let currentTrackDisplayName = playback.currentTrackDisplayName {
+            return currentTrackDisplayName
+        }
+        return "SCAMP MICRO DECK"
     }
 
     var body: some View {
@@ -58,9 +57,42 @@ struct ContentView: View {
                             ZStack {
                                 Color.clear
 
-                                Text("Arm / Controls Area")
-                                    .font(.headline)
-                                    .foregroundStyle(.white.opacity(0.9))
+                                VStack(spacing: 0) {
+                                    Spacer()
+
+                                    Text("Arm / Controls Area")
+                                        .font(.headline)
+                                        .foregroundStyle(.white.opacity(0.9))
+
+                                    Spacer()
+
+                                    HStack(spacing: 12) {
+                                        Button {
+                                            playback.loadFolder()
+                                        } label: {
+                                            Image(systemName: "folder")
+                                        }
+
+                                        Button {
+                                            playback.playPrevious()
+                                        } label: {
+                                            Image(systemName: "backward.fill")
+                                        }
+
+                                        Button {
+                                            playback.togglePlayPause()
+                                        } label: {
+                                            Image(systemName: playback.isPlaying ? "pause.fill" : "play.fill")
+                                        }
+
+                                        Button {
+                                            playback.playNext()
+                                        } label: {
+                                            Image(systemName: "forward.fill")
+                                        }
+                                    }
+                                    .padding(.bottom, 14)
+                                }
                             }
                             .frame(width: controlsWidth, height: squareSize)
                             .overlay(
@@ -89,21 +121,6 @@ struct ContentView: View {
         .toolbar(removing: .sidebarToggle)
         .background(TitlebarSidebarButtonHider())
         .frame(width: windowWidth, height: windowHeight)
-    }
-
-    private func addItem() {
-        withAnimation {
-            let newItem = Item(timestamp: Date())
-            modelContext.insert(newItem)
-        }
-    }
-
-    private func deleteItems(offsets: IndexSet) {
-        withAnimation {
-            for index in offsets {
-                modelContext.delete(items[index])
-            }
-        }
     }
 }
 
@@ -193,5 +210,4 @@ private struct WoodGrainOverlay: View {
 
 #Preview {
     ContentView()
-        .modelContainer(for: Item.self, inMemory: true)
 }
