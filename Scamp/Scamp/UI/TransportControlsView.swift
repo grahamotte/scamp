@@ -3,23 +3,23 @@ import SwiftUI
 struct TransportControlsView: View {
     @ObservedObject var playback: PlaybackController
     private let buttonDiameter: CGFloat = 40
-    private let iconSize: CGFloat = 16
+    private let iconSize: CGFloat = 11
 
     var body: some View {
         HStack(spacing: 0) {
-            controlButton(icon: "folder.fill") {
+            controlButton(icon: "eject.fill") {
                 playback.loadFolder()
             }
 
-            controlButton(icon: "backward.fill", isDisabled: !playback.canPlayPrevious) {
+            controlButton(icon: "backward.fill") {
                 playback.playPrevious()
             }
 
-            controlButton(icon: playback.isPlaying ? "pause.fill" : "play.fill", isDisabled: !playback.hasPlaylist) {
+            controlButton(icon: "playpause.fill", showsPressDepth: true) {
                 playback.togglePlayPause()
             }
 
-            controlButton(icon: "forward.fill", isDisabled: !playback.canPlayNext) {
+            controlButton(icon: "forward.fill") {
                 playback.playNext()
             }
         }
@@ -28,43 +28,82 @@ struct TransportControlsView: View {
     }
 
     @ViewBuilder
-    private func controlButton(icon: String, isDisabled: Bool = false, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
+    private func controlButton(icon: String, showsPressDepth: Bool = false, action: @escaping () -> Void) -> some View {
+        Button {
+            ControlClickSoundPlayer.shared.play()
+            action()
+        } label: {
             Image(systemName: icon)
-                .font(.system(size: iconSize, weight: .semibold))
-                .foregroundStyle(isDisabled ? Color(white: 0.55) : Color(white: 0.2))
-                .frame(width: buttonDiameter, height: buttonDiameter)
-                .background {
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: isDisabled
-                                    ? [Color(white: 0.73), Color(white: 0.58), Color(white: 0.67)]
-                                    : [Color(white: 0.89), Color(white: 0.66), Color(white: 0.82)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                }
-                .overlay {
-                    Circle()
-                        .stroke(
-                            LinearGradient(
-                                colors: [Color.white.opacity(0.7), Color.black.opacity(0.3)],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            ),
-                            lineWidth: 1.2
-                        )
-                }
-                .overlay {
-                    Circle()
-                        .stroke(Color.white.opacity(0.3), lineWidth: 1)
-                        .padding(buttonDiameter * 0.12)
-                }
         }
-        .buttonStyle(.plain)
-        .disabled(isDisabled)
+        .buttonStyle(
+            PhysicalTransportButtonStyle(
+                buttonDiameter: buttonDiameter,
+                iconSize: iconSize,
+                showsPressDepth: showsPressDepth
+            )
+        )
         .frame(maxWidth: .infinity)
+    }
+}
+
+private struct PhysicalTransportButtonStyle: ButtonStyle {
+    let buttonDiameter: CGFloat
+    let iconSize: CGFloat
+    let showsPressDepth: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        let centerOffset = showsPressDepth && configuration.isPressed ? buttonDiameter * 0.05 : 0
+        let centerShadowRadius = showsPressDepth && configuration.isPressed ? buttonDiameter * 0.02 : buttonDiameter * 0.08
+        let centerShadowY = showsPressDepth && configuration.isPressed ? buttonDiameter * 0.02 : buttonDiameter * 0.05
+
+        return ZStack {
+            Circle()
+                .fill(
+                    LinearGradient(
+                        colors: [Color(white: 0.9), Color(white: 0.67), Color(white: 0.83)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+
+            Circle()
+                .stroke(
+                    LinearGradient(
+                        colors: [Color.white.opacity(0.7), Color.black.opacity(0.3)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ),
+                    lineWidth: 1.2
+                )
+
+            Circle()
+                .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                .padding(buttonDiameter * 0.12)
+
+            Circle()
+                .fill(
+                    LinearGradient(
+                        colors: [Color(white: 0.96), Color(white: 0.75), Color(white: 0.86)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .padding(buttonDiameter * 0.18)
+                .offset(y: centerOffset)
+                .shadow(
+                    color: .black.opacity(0.2),
+                    radius: centerShadowRadius,
+                    x: 0,
+                    y: centerShadowY
+                )
+
+            configuration.label
+                .font(.system(size: iconSize, weight: .semibold))
+                .foregroundStyle(Color(white: 0.29))
+                .offset(y: centerOffset)
+        }
+        .frame(width: buttonDiameter, height: buttonDiameter)
+        .contentShape(Circle())
+        .animation(.easeOut(duration: 0.08), value: configuration.isPressed)
     }
 }

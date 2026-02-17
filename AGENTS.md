@@ -27,7 +27,7 @@
 
 - Keep changes in thin, testable vertical slices.
 - Keep playback engine, queue state, ingestion, and visualization as separate concerns.
-- After code changes, run a local build and report result.
+- After code changes, run `mise start` and report result.
 
 ## Platform Constraints
 
