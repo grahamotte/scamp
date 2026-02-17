@@ -18,9 +18,5 @@ struct ControlsAreaView: View {
             }
         }
         .frame(width: width, height: height)
-        .overlay(
-            Rectangle()
-                .stroke(Color.white.opacity(0.5), lineWidth: 1)
-        )
     }
 }

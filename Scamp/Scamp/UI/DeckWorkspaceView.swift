@@ -3,6 +3,7 @@ import SwiftUI
 struct DeckWorkspaceView: View {
     @ObservedObject var playback: PlaybackController
     @State private var scrubDragProgress: Double?
+    @State private var showsTonearmDebugGuides = false
 
     private var bottomBarTitle: String {
         if playback.isPlaying, let currentTrackDisplayName = playback.currentTrackDisplayName {
@@ -37,23 +38,25 @@ struct DeckWorkspaceView: View {
                             )
                         }
 
-                        if playback.hasPlaylist {
-                            TonearmWorkspaceOverlay(
-                                deckWidth: geometry.size.width,
-                                deckHeight: squareSize,
-                                recordOriginX: chromeInset,
-                                recordDiameter: squareSize,
-                                controlsWidth: controlsWidth,
-                                progress: scrubProgress,
-                                onScrubChanged: { progress in
-                                    scrubDragProgress = progress
-                                },
-                                onScrubEnded: { progress in
-                                    scrubDragProgress = nil
-                                    playback.seek(toPlaylistProgress: progress)
-                                }
-                            )
-                        }
+                        TonearmWorkspaceOverlay(
+                            deckWidth: geometry.size.width,
+                            deckHeight: squareSize,
+                            recordOriginX: chromeInset,
+                            recordDiameter: squareSize,
+                            controlsWidth: controlsWidth,
+                            progress: scrubProgress,
+                            showsDebugGuides: showsTonearmDebugGuides,
+                            onCounterweightTapped: {
+                                showsTonearmDebugGuides.toggle()
+                            },
+                            onScrubChanged: { progress in
+                                scrubDragProgress = progress
+                            },
+                            onScrubEnded: { progress in
+                                scrubDragProgress = nil
+                                playback.seek(toPlaylistProgress: progress)
+                            }
+                        )
                     }
                     .frame(width: geometry.size.width, height: squareSize, alignment: .topLeading)
 
@@ -76,6 +79,8 @@ private struct TonearmWorkspaceOverlay: View {
     let recordDiameter: CGFloat
     let controlsWidth: CGFloat
     let progress: Double
+    let showsDebugGuides: Bool
+    let onCounterweightTapped: () -> Void
     let onScrubChanged: (Double) -> Void
     let onScrubEnded: (Double) -> Void
 
@@ -86,8 +91,9 @@ private struct TonearmWorkspaceOverlay: View {
         let recordGeometry = layout.resolved(forDiameter: recordDiameter)
         let scrubGuide = scrubGuideGeometry(for: recordGeometry)
         let holderDiameter = recordDiameter * 0.25
+        let controlsTrailingInset = recordOriginX
         let pivotPoint = CGPoint(
-            x: recordOriginX + recordDiameter + (controlsWidth / 2),
+            x: deckWidth - controlsTrailingInset - (holderDiameter / 2),
             y: holderDiameter / 2
         )
         let redGuideDirection = normalizedVector(from: scrubGuide.start, to: scrubGuide.end)
@@ -121,20 +127,17 @@ private struct TonearmWorkspaceOverlay: View {
             x: pivotPoint.x - (armDirection.x * armRearLength),
             y: pivotPoint.y - (armDirection.y * armRearLength)
         )
+        let counterweightWidth = max(30, recordDiameter * 0.1)
+        let counterweightHeight = max(16, recordDiameter * 0.05)
+        let counterweightPosition = CGPoint(
+            x: pivotPoint.x - (armDirection.x * (armRearLength * 0.68)),
+            y: pivotPoint.y - (armDirection.y * (armRearLength * 0.68))
+        )
         let armShaftThickness = max(8, recordDiameter * 0.015)
         let headWidth = max(24, recordDiameter * 0.08)
         let headHeight = max(14, recordDiameter * 0.042)
         let debugDotDiameter = max(3, recordDiameter * 0.012)
         let debugHandleDiameter = max(3, recordDiameter * 0.009)
-        let stylusNormal = stylusDownwardNormal(
-            armDirection: headAxisDirection,
-            headCenter: needlePoint,
-            recordCenter: scrubGuide.recordCenter
-        )
-        let stylusPoint = CGPoint(
-            x: needlePoint.x + (stylusNormal.x * (headHeight * 0.52)),
-            y: needlePoint.y + (stylusNormal.y * (headHeight * 0.52))
-        )
         let tonearmScrubGesture = tonearmDragGesture(
             start: scrubGuide.start,
             control: orangeCurveControl,
@@ -195,18 +198,15 @@ private struct TonearmWorkspaceOverlay: View {
                         )
                     )
                     .frame(
-                        width: max(30, recordDiameter * 0.1),
-                        height: max(16, recordDiameter * 0.05)
+                        width: counterweightWidth,
+                        height: counterweightHeight
                     )
                     .overlay(
                         Capsule()
                             .stroke(Color.black.opacity(0.3), lineWidth: 1)
                     )
                     .rotationEffect(Angle(radians: atan2(armDirection.y, armDirection.x)))
-                    .position(
-                        x: pivotPoint.x - (armDirection.x * (armRearLength * 0.68)),
-                        y: pivotPoint.y - (armDirection.y * (armRearLength * 0.68))
-                    )
+                    .position(counterweightPosition)
 
                 Circle()
                     .fill(
@@ -242,13 +242,18 @@ private struct TonearmWorkspaceOverlay: View {
                     )
                     .rotationEffect(headAngle)
                     .position(needlePoint)
-
-                Circle()
-                    .fill(Color.black.opacity(0.92))
-                    .frame(width: max(3, recordDiameter * 0.008), height: max(3, recordDiameter * 0.008))
-                    .position(stylusPoint)
             }
             .allowsHitTesting(false)
+
+            Capsule()
+                .fill(Color.clear)
+                .frame(width: max(36, counterweightWidth * 1.2), height: max(24, counterweightHeight * 1.4))
+                .contentShape(Capsule())
+                .rotationEffect(Angle(radians: atan2(armDirection.y, armDirection.x)))
+                .position(counterweightPosition)
+                .onTapGesture {
+                    onCounterweightTapped()
+                }
 
             Circle()
                 .fill(Color.clear)
@@ -260,43 +265,45 @@ private struct TonearmWorkspaceOverlay: View {
                 .position(needlePoint)
                 .gesture(tonearmScrubGesture)
 
-            Group {
+            if showsDebugGuides {
+                Group {
+                    Path { path in
+                        path.move(to: scrubGuide.start)
+                        path.addLine(to: scrubGuide.end)
+                    }
+                    .stroke(Color.red, style: StrokeStyle(lineWidth: max(1, recordDiameter * 0.003), lineCap: .round))
+
+                    Circle()
+                        .fill(Color.red)
+                        .frame(width: debugDotDiameter, height: debugDotDiameter)
+                        .position(scrubGuide.start)
+
+                    Circle()
+                        .fill(Color.red)
+                        .frame(width: debugDotDiameter, height: debugDotDiameter)
+                        .position(scrubGuide.end)
+                }
+                .allowsHitTesting(false)
+
                 Path { path in
                     path.move(to: scrubGuide.start)
-                    path.addLine(to: scrubGuide.end)
+                    path.addQuadCurve(to: scrubGuide.end, control: orangeCurveControl)
                 }
-                .stroke(Color.red, style: StrokeStyle(lineWidth: max(1, recordDiameter * 0.003), lineCap: .round))
+                .stroke(Color.orange, style: StrokeStyle(lineWidth: max(1, recordDiameter * 0.003), lineCap: .round))
+                .allowsHitTesting(false)
 
                 Circle()
-                    .fill(Color.red)
-                    .frame(width: debugDotDiameter, height: debugDotDiameter)
-                    .position(scrubGuide.start)
-
-                Circle()
-                    .fill(Color.red)
-                    .frame(width: debugDotDiameter, height: debugDotDiameter)
-                    .position(scrubGuide.end)
+                    .fill(Color.clear)
+                    .frame(width: max(18, debugHandleDiameter * 2), height: max(18, debugHandleDiameter * 2))
+                    .overlay {
+                        Circle()
+                            .fill(Color.green)
+                            .frame(width: debugHandleDiameter, height: debugHandleDiameter)
+                    }
+                    .contentShape(Circle())
+                    .position(needlePoint)
+                    .gesture(tonearmScrubGesture)
             }
-            .allowsHitTesting(false)
-
-            Path { path in
-                path.move(to: scrubGuide.start)
-                path.addQuadCurve(to: scrubGuide.end, control: orangeCurveControl)
-            }
-            .stroke(Color.orange, style: StrokeStyle(lineWidth: max(1, recordDiameter * 0.003), lineCap: .round))
-            .allowsHitTesting(false)
-
-            Circle()
-                .fill(Color.clear)
-                .frame(width: max(18, debugHandleDiameter * 2), height: max(18, debugHandleDiameter * 2))
-                .overlay {
-                    Circle()
-                        .fill(Color.green)
-                        .frame(width: debugHandleDiameter, height: debugHandleDiameter)
-                }
-                .contentShape(Circle())
-                .position(needlePoint)
-                .gesture(tonearmScrubGesture)
         }
         .frame(width: deckWidth, height: deckHeight, alignment: .topLeading)
         .clipped()
@@ -445,22 +452,6 @@ private struct TonearmWorkspaceOverlay: View {
         return CGPoint(x: -unit.x, y: -unit.y)
     }
 
-    private func stylusDownwardNormal(
-        armDirection: CGPoint,
-        headCenter: CGPoint,
-        recordCenter: CGPoint
-    ) -> CGPoint {
-        var normal = CGPoint(x: -armDirection.y, y: armDirection.x)
-        let toRecordCenter = CGPoint(
-            x: recordCenter.x - headCenter.x,
-            y: recordCenter.y - headCenter.y
-        )
-        let dot = (normal.x * toRecordCenter.x) + (normal.y * toRecordCenter.y)
-        if dot < 0 {
-            normal = CGPoint(x: -normal.x, y: -normal.y)
-        }
-        return normal
-    }
 }
 
 private struct ScrubGuideGeometry {
