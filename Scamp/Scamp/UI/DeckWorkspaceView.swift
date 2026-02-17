@@ -79,41 +79,67 @@ private struct TonearmWorkspaceOverlay: View {
     let onScrubChanged: (Double) -> Void
     let onScrubEnded: (Double) -> Void
 
-    private static let scrubGuideAngleDegrees: Double = -65
+    private static let scrubGuideAngleDegrees: Double = -45
     private let layout = VinylRecordLayout()
 
     var body: some View {
         let recordGeometry = layout.resolved(forDiameter: recordDiameter)
-        let scrubGuide = scrubGuideGeometry(for: recordGeometry, progress: progress)
+        let scrubGuide = scrubGuideGeometry(for: recordGeometry)
         let holderDiameter = recordDiameter * 0.25
         let pivotPoint = CGPoint(
             x: recordOriginX + recordDiameter + (controlsWidth / 2),
             y: holderDiameter / 2
         )
-        let armDirection = normalizedVector(from: pivotPoint, to: scrubGuide.handle)
-        let armAngle = Angle(radians: atan2(armDirection.y, armDirection.x))
+        let redGuideDirection = normalizedVector(from: scrubGuide.start, to: scrubGuide.end)
+        let midpointGuidePerpendicular = CGPoint(x: -redGuideDirection.y, y: redGuideDirection.x)
+        let redGuideMidpoint = midpoint(between: scrubGuide.start, and: scrubGuide.end)
+        let controlDirection = orientedToward(
+            unit: midpointGuidePerpendicular,
+            targetVector: CGPoint(
+                x: redGuideMidpoint.x - pivotPoint.x,
+                y: redGuideMidpoint.y - pivotPoint.y
+            )
+        )
+        let redGuideLength = distance(from: scrubGuide.start, to: scrubGuide.end)
+        let orangeCurveOffset = max(redGuideLength * 0.27, recordDiameter * 0.045)
+        let orangeCurveControl = CGPoint(
+            x: redGuideMidpoint.x + (controlDirection.x * orangeCurveOffset),
+            y: redGuideMidpoint.y + (controlDirection.y * orangeCurveOffset)
+        )
+        let clampedProgress = min(max(progress, 0), 1)
+        let needlePoint = pointOnQuadraticBezier(
+            start: scrubGuide.start,
+            control: orangeCurveControl,
+            end: scrubGuide.end,
+            progress: clampedProgress
+        )
+        let armDirection = normalizedVector(from: pivotPoint, to: needlePoint)
+        let headAxisDirection = CGPoint(x: -redGuideDirection.y, y: redGuideDirection.x)
+        let headAngle = Angle(radians: atan2(headAxisDirection.y, headAxisDirection.x))
         let armRearLength = max(26, recordDiameter * 0.09)
         let armRearPoint = CGPoint(
             x: pivotPoint.x - (armDirection.x * armRearLength),
             y: pivotPoint.y - (armDirection.y * armRearLength)
         )
-        let armShaftLength = distance(from: armRearPoint, to: scrubGuide.handle)
-        let armShaftCenter = midpoint(between: armRearPoint, and: scrubGuide.handle)
         let armShaftThickness = max(8, recordDiameter * 0.015)
         let headWidth = max(24, recordDiameter * 0.08)
         let headHeight = max(14, recordDiameter * 0.042)
         let debugDotDiameter = max(3, recordDiameter * 0.012)
         let debugHandleDiameter = max(3, recordDiameter * 0.009)
         let stylusNormal = stylusDownwardNormal(
-            armDirection: armDirection,
-            headCenter: scrubGuide.handle,
+            armDirection: headAxisDirection,
+            headCenter: needlePoint,
             recordCenter: scrubGuide.recordCenter
         )
         let stylusPoint = CGPoint(
-            x: scrubGuide.handle.x + (stylusNormal.x * (headHeight * 0.52)),
-            y: scrubGuide.handle.y + (stylusNormal.y * (headHeight * 0.52))
+            x: needlePoint.x + (stylusNormal.x * (headHeight * 0.52)),
+            y: needlePoint.y + (stylusNormal.y * (headHeight * 0.52))
         )
-        let scrubGesture = dragGesture(start: scrubGuide.start, end: scrubGuide.end)
+        let tonearmScrubGesture = tonearmDragGesture(
+            start: scrubGuide.start,
+            control: orangeCurveControl,
+            end: scrubGuide.end
+        )
 
         return ZStack {
             Group {
@@ -139,22 +165,26 @@ private struct TonearmWorkspaceOverlay: View {
                     .shadow(color: .black.opacity(0.3), radius: 8, x: 0, y: 4)
                     .position(pivotPoint)
 
-                Capsule()
-                    .fill(
-                        LinearGradient(
-                            colors: [Color(white: 0.86), Color(white: 0.62), Color(white: 0.8)],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
+                Path { path in
+                    path.move(to: armRearPoint)
+                    path.addLine(to: needlePoint)
+                }
+                .stroke(style: StrokeStyle(lineWidth: armShaftThickness, lineCap: .round, lineJoin: .round))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [Color(white: 0.88), Color(white: 0.64), Color(white: 0.82)],
+                        startPoint: .top,
+                        endPoint: .bottom
                     )
-                    .frame(width: armShaftLength, height: armShaftThickness)
-                    .overlay(
-                        Capsule()
-                            .stroke(Color.black.opacity(0.2), lineWidth: 1)
-                    )
-                    .rotationEffect(armAngle)
-                    .position(armShaftCenter)
-                    .shadow(color: .black.opacity(0.24), radius: 3, x: 0, y: 2)
+                )
+                .shadow(color: .black.opacity(0.24), radius: 3, x: 0, y: 2)
+                .overlay {
+                    Path { path in
+                        path.move(to: armRearPoint)
+                        path.addLine(to: needlePoint)
+                    }
+                    .stroke(Color.black.opacity(0.18), style: StrokeStyle(lineWidth: 1.1, lineCap: .round, lineJoin: .round))
+                }
 
                 Capsule()
                     .fill(
@@ -172,7 +202,7 @@ private struct TonearmWorkspaceOverlay: View {
                         Capsule()
                             .stroke(Color.black.opacity(0.3), lineWidth: 1)
                     )
-                    .rotationEffect(armAngle)
+                    .rotationEffect(Angle(radians: atan2(armDirection.y, armDirection.x)))
                     .position(
                         x: pivotPoint.x - (armDirection.x * (armRearLength * 0.68)),
                         y: pivotPoint.y - (armDirection.y * (armRearLength * 0.68))
@@ -210,8 +240,8 @@ private struct TonearmWorkspaceOverlay: View {
                         RoundedRectangle(cornerRadius: max(2.5, headHeight * 0.2), style: .continuous)
                             .stroke(Color.black.opacity(0.22), lineWidth: 1)
                     )
-                    .rotationEffect(armAngle)
-                    .position(scrubGuide.handle)
+                    .rotationEffect(headAngle)
+                    .position(needlePoint)
 
                 Circle()
                     .fill(Color.black.opacity(0.92))
@@ -227,8 +257,8 @@ private struct TonearmWorkspaceOverlay: View {
                     height: max(28, headWidth * 1.3)
                 )
                 .contentShape(Circle())
-                .position(scrubGuide.handle)
-                .gesture(scrubGesture)
+                .position(needlePoint)
+                .gesture(tonearmScrubGesture)
 
             Group {
                 Path { path in
@@ -249,6 +279,13 @@ private struct TonearmWorkspaceOverlay: View {
             }
             .allowsHitTesting(false)
 
+            Path { path in
+                path.move(to: scrubGuide.start)
+                path.addQuadCurve(to: scrubGuide.end, control: orangeCurveControl)
+            }
+            .stroke(Color.orange, style: StrokeStyle(lineWidth: max(1, recordDiameter * 0.003), lineCap: .round))
+            .allowsHitTesting(false)
+
             Circle()
                 .fill(Color.clear)
                 .frame(width: max(18, debugHandleDiameter * 2), height: max(18, debugHandleDiameter * 2))
@@ -258,16 +295,15 @@ private struct TonearmWorkspaceOverlay: View {
                         .frame(width: debugHandleDiameter, height: debugHandleDiameter)
                 }
                 .contentShape(Circle())
-                .position(scrubGuide.handle)
-                .gesture(scrubGesture)
+                .position(needlePoint)
+                .gesture(tonearmScrubGesture)
         }
         .frame(width: deckWidth, height: deckHeight, alignment: .topLeading)
         .clipped()
     }
 
     private func scrubGuideGeometry(
-        for recordGeometry: VinylRecordGeometry,
-        progress: Double
+        for recordGeometry: VinylRecordGeometry
     ) -> ScrubGuideGeometry {
         let direction = scrubGuideDirection()
         let center = CGPoint(x: recordOriginX + (recordDiameter / 2), y: recordDiameter / 2)
@@ -282,39 +318,99 @@ private struct TonearmWorkspaceOverlay: View {
         return ScrubGuideGeometry(
             recordCenter: center,
             start: start,
-            end: end,
-            handle: pointOnScrubGuide(for: progress, start: start, end: end)
+            end: end
         )
     }
 
-    private func pointOnScrubGuide(for progress: Double, start: CGPoint, end: CGPoint) -> CGPoint {
+    private func pointOnQuadraticBezier(
+        start: CGPoint,
+        control: CGPoint,
+        end: CGPoint,
+        progress: Double
+    ) -> CGPoint {
         let t = min(max(progress, 0), 1)
+        let oneMinusT = 1 - CGFloat(t)
+        let tCGFloat = CGFloat(t)
         return CGPoint(
-            x: start.x + ((end.x - start.x) * t),
-            y: start.y + ((end.y - start.y) * t)
+            x: (oneMinusT * oneMinusT * start.x) + (2 * oneMinusT * tCGFloat * control.x) + (tCGFloat * tCGFloat * end.x),
+            y: (oneMinusT * oneMinusT * start.y) + (2 * oneMinusT * tCGFloat * control.y) + (tCGFloat * tCGFloat * end.y)
         )
     }
 
-    private func projectedScrubProgress(for location: CGPoint, start: CGPoint, end: CGPoint) -> Double {
-        let segmentDX = end.x - start.x
-        let segmentDY = end.y - start.y
-        let segmentLengthSquared = (segmentDX * segmentDX) + (segmentDY * segmentDY)
-        guard segmentLengthSquared > 0 else { return 0 }
-
-        let localX = location.x - start.x
-        let localY = location.y - start.y
-        let projection = ((localX * segmentDX) + (localY * segmentDY)) / segmentLengthSquared
-        return min(max(Double(projection), 0), 1)
-    }
-
-    private func dragGesture(start: CGPoint, end: CGPoint) -> some Gesture {
+    private func tonearmDragGesture(
+        start: CGPoint,
+        control: CGPoint,
+        end: CGPoint
+    ) -> some Gesture {
         DragGesture(minimumDistance: 0)
             .onChanged { value in
-                onScrubChanged(projectedScrubProgress(for: value.location, start: start, end: end))
+                onScrubChanged(projectedTonearmProgress(
+                    for: value.location,
+                    start: start,
+                    control: control,
+                    end: end
+                ))
             }
             .onEnded { value in
-                onScrubEnded(projectedScrubProgress(for: value.location, start: start, end: end))
+                onScrubEnded(projectedTonearmProgress(
+                    for: value.location,
+                    start: start,
+                    control: control,
+                    end: end
+                ))
             }
+    }
+
+    private func projectedTonearmProgress(
+        for location: CGPoint,
+        start: CGPoint,
+        control: CGPoint,
+        end: CGPoint
+    ) -> Double {
+        let samples = 180
+        var bestDistanceSquared = CGFloat.infinity
+        var bestProgress: Double = 0
+        var previous = pointOnQuadraticBezier(start: start, control: control, end: end, progress: 0)
+
+        for sampleIndex in 1...samples {
+            let sampleProgress = Double(sampleIndex) / Double(samples)
+            let current = pointOnQuadraticBezier(
+                start: start,
+                control: control,
+                end: end,
+                progress: sampleProgress
+            )
+            let segment = CGPoint(x: current.x - previous.x, y: current.y - previous.y)
+            let segmentLengthSquared = (segment.x * segment.x) + (segment.y * segment.y)
+
+            let projection: CGFloat
+            if segmentLengthSquared > 0.0001 {
+                let toLocation = CGPoint(x: location.x - previous.x, y: location.y - previous.y)
+                projection = min(
+                    max(((toLocation.x * segment.x) + (toLocation.y * segment.y)) / segmentLengthSquared, 0),
+                    1
+                )
+            } else {
+                projection = 0
+            }
+
+            let projectedPoint = CGPoint(
+                x: previous.x + (segment.x * projection),
+                y: previous.y + (segment.y * projection)
+            )
+            let dx = location.x - projectedPoint.x
+            let dy = location.y - projectedPoint.y
+            let distanceSquared = (dx * dx) + (dy * dy)
+
+            if distanceSquared < bestDistanceSquared {
+                bestDistanceSquared = distanceSquared
+                bestProgress = (Double(sampleIndex - 1) + Double(projection)) / Double(samples)
+            }
+
+            previous = current
+        }
+
+        return min(max(bestProgress, 0), 1)
     }
 
     private func scrubGuideDirection() -> CGPoint {
@@ -341,6 +437,14 @@ private struct TonearmWorkspaceOverlay: View {
         return CGPoint(x: dx / magnitude, y: dy / magnitude)
     }
 
+    private func orientedToward(unit: CGPoint, targetVector: CGPoint) -> CGPoint {
+        let dot = (unit.x * targetVector.x) + (unit.y * targetVector.y)
+        if dot >= 0 {
+            return unit
+        }
+        return CGPoint(x: -unit.x, y: -unit.y)
+    }
+
     private func stylusDownwardNormal(
         armDirection: CGPoint,
         headCenter: CGPoint,
@@ -363,5 +467,4 @@ private struct ScrubGuideGeometry {
     let recordCenter: CGPoint
     let start: CGPoint
     let end: CGPoint
-    let handle: CGPoint
 }
