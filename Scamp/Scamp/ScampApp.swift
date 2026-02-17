@@ -10,6 +10,9 @@ import SwiftData
 
 @main
 struct ScampApp: App {
+    private let windowWidth: CGFloat = 1100
+    private let windowHeight: CGFloat = 720
+
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             Item.self,
@@ -27,6 +30,8 @@ struct ScampApp: App {
         WindowGroup {
             ContentView()
         }
+        .defaultSize(width: windowWidth, height: windowHeight)
+        .windowResizability(.contentSize)
         .modelContainer(sharedModelContainer)
     }
 }
