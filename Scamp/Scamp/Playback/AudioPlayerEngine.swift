@@ -11,6 +11,10 @@ final class AudioPlayerEngine: NSObject {
         player != nil
     }
 
+    var currentTime: TimeInterval {
+        player?.currentTime ?? 0
+    }
+
     func play(url: URL) throws {
         let player = try AVAudioPlayer(contentsOf: url)
         player.delegate = self
@@ -25,6 +29,13 @@ final class AudioPlayerEngine: NSObject {
 
     func pause() {
         player?.pause()
+    }
+
+    func seek(to time: TimeInterval) {
+        guard let player else { return }
+        let maxTime = max(player.duration, 0)
+        let clampedTime = min(max(time, 0), maxTime)
+        player.currentTime = clampedTime
     }
 
     func stop() {

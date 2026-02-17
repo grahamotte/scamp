@@ -56,6 +56,27 @@ final class PlaybackController: ObservableObject {
         }
     }
 
+    var playlistProgress: Double {
+        guard
+            let currentIndex,
+            !playlist.isEmpty
+        else {
+            return 0
+        }
+
+        let durations = trackDurations
+        let totalDuration = durations.reduce(0, +)
+        guard totalDuration > 0, durations.indices.contains(currentIndex) else {
+            return 0
+        }
+
+        let elapsedBeforeCurrentTrack = durations.prefix(currentIndex).reduce(0, +)
+        let currentTrackDuration = durations[currentIndex]
+        let clampedCurrentTrackTime = min(max(engine.currentTime, 0), currentTrackDuration)
+        let elapsed = elapsedBeforeCurrentTrack + clampedCurrentTrackTime
+        return min(max(elapsed / totalDuration, 0), 1)
+    }
+
     // Forward-looking API for arm scrubbing: map a normalized arm position to playlist index.
     func play(atPlaylistProgress progress: Double) {
         guard !playlist.isEmpty else { return }
@@ -64,6 +85,40 @@ final class PlaybackController: ObservableObject {
         let maxIndex = playlist.count - 1
         let targetIndex = Int(round(clamped * Double(maxIndex)))
         startTrack(at: targetIndex)
+    }
+
+    func seek(toPlaylistProgress progress: Double) {
+        guard !playlist.isEmpty else { return }
+
+        let durations = trackDurations
+        let totalDuration = durations.reduce(0, +)
+        guard totalDuration > 0 else {
+            play(atPlaylistProgress: progress)
+            return
+        }
+
+        let clampedProgress = min(max(progress, 0), 1)
+        let targetElapsed = clampedProgress * totalDuration
+
+        var elapsed: TimeInterval = 0
+        for (index, duration) in durations.enumerated() {
+            let nextElapsed = elapsed + duration
+            let isTargetTrack = targetElapsed < nextElapsed || index == durations.count - 1
+            if !isTargetTrack {
+                elapsed = nextElapsed
+                continue
+            }
+
+            let offsetInTrack = min(max(targetElapsed - elapsed, 0), max(duration - 0.001, 0))
+            if currentIndex == index, engine.hasLoadedTrack {
+                engine.seek(to: offsetInTrack)
+                engine.resume()
+                isPlaying = true
+            } else {
+                startTrack(at: index, startTime: offsetInTrack)
+            }
+            return
+        }
     }
 
     func loadFolder() {
@@ -186,7 +241,7 @@ final class PlaybackController: ObservableObject {
         }
     }
 
-    private func startTrack(at index: Int) {
+    private func startTrack(at index: Int, startTime: TimeInterval = 0) {
         guard playlist.indices.contains(index) else {
             stopPlayback(clearSelection: true)
             return
@@ -196,6 +251,9 @@ final class PlaybackController: ObservableObject {
 
         do {
             try engine.play(url: track.url)
+            if startTime > 0 {
+                engine.seek(to: startTime)
+            }
             currentIndex = index
             isPlaying = true
         } catch {
