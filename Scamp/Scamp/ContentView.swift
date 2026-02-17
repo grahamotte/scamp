@@ -5,6 +5,7 @@
 //  Created by Graham Otte on 2/16/26.
 //
 
+import AppKit
 import SwiftUI
 import SwiftData
 
@@ -19,18 +20,61 @@ struct ContentView: View {
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
-            Text("hidden")
+            EmptyView()
+                .navigationSplitViewColumnWidth(min: 0, ideal: 0, max: 0)
         } detail: {
             ZStack {
                 WoodGrainBackground()
                     .ignoresSafeArea()
 
-                Text("main view")
+                GeometryReader { geometry in
+                    let chromeInset = geometry.safeAreaInsets.top
+                    let squareSize = max(0, geometry.size.height - chromeInset)
+                    let controlsWidth = max(0, geometry.size.width - chromeInset - squareSize)
+
+                    VStack(spacing: 0) {
+                        HStack(spacing: 0) {
+                            Color.clear
+                                .frame(width: chromeInset)
+
+                            ZStack {
+                                Color.black.opacity(0.16)
+
+                                Text("Record Area")
+                                    .font(.headline)
+                                    .foregroundStyle(.white.opacity(0.9))
+                            }
+                            .frame(width: squareSize, height: squareSize)
+                            .overlay(
+                                Rectangle()
+                                    .stroke(Color.white.opacity(0.25), lineWidth: 1)
+                            )
+
+                            ZStack {
+                                Color.white.opacity(0.08)
+
+                                Text("Arm / Controls Area")
+                                    .font(.headline)
+                                    .foregroundStyle(.white.opacity(0.9))
+                            }
+                            .frame(width: controlsWidth, height: squareSize)
+                            .overlay(
+                                Rectangle()
+                                    .stroke(Color.white.opacity(0.25), lineWidth: 1)
+                            )
+                        }
+
+                        Color.clear
+                            .frame(height: chromeInset)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .toolbarVisibility(.hidden, for: .windowToolbar)
+        .navigationSplitViewStyle(.balanced)
         .toolbar(removing: .sidebarToggle)
+        .background(TitlebarSidebarButtonHider())
         .frame(width: windowWidth, height: windowHeight)
     }
 
@@ -46,6 +90,50 @@ struct ContentView: View {
             for index in offsets {
                 modelContext.delete(items[index])
             }
+        }
+    }
+}
+
+private struct TitlebarSidebarButtonHider: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        NSView()
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async {
+            guard let window = nsView.window else { return }
+            removeToolbarSidebarItems(from: window)
+            hideTitlebarSidebarButtons(in: window)
+        }
+    }
+
+    private func removeToolbarSidebarItems(from window: NSWindow) {
+        guard let toolbar = window.toolbar else { return }
+
+        for index in toolbar.items.indices.reversed() {
+            let identifier = toolbar.items[index].itemIdentifier.rawValue.lowercased()
+            if identifier.contains("sidebar") || identifier.contains("togglesidebar") {
+                toolbar.removeItem(at: index)
+            }
+        }
+    }
+
+    private func hideTitlebarSidebarButtons(in window: NSWindow) {
+        guard let titlebarRoot = window.standardWindowButton(.closeButton)?.superview else { return }
+        hideSidebarButtonsRecursively(in: titlebarRoot)
+    }
+
+    private func hideSidebarButtonsRecursively(in view: NSView) {
+        for child in view.subviews {
+            if let button = child as? NSButton {
+                let actionName = button.action.map { NSStringFromSelector($0).lowercased() } ?? ""
+                let identifier = button.identifier?.rawValue.lowercased() ?? ""
+                if actionName.contains("togglesidebar") || identifier.contains("sidebar") {
+                    button.isHidden = true
+                    button.isEnabled = false
+                }
+            }
+            hideSidebarButtonsRecursively(in: child)
         }
     }
 }

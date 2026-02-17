@@ -32,6 +32,7 @@ struct ScampApp: App {
         }
         .defaultSize(width: windowWidth, height: windowHeight)
         .windowResizability(.contentSize)
+        .windowStyle(.hiddenTitleBar)
         .modelContainer(sharedModelContainer)
     }
 }
