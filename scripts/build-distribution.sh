@@ -35,16 +35,16 @@ if ! xcodebuild -version >/dev/null 2>&1; then
   exit 1
 fi
 
-echo "Building unsigned Scamp (Release)..."
+echo "Building ad-hoc signed Scamp (Release)..."
 xcodebuild \
   -project "$PROJECT_PATH" \
   -scheme Scamp \
   -configuration Release \
   -derivedDataPath "$DERIVED_DATA_PATH" \
   -destination "platform=macOS" \
-  CODE_SIGNING_ALLOWED=NO \
-  CODE_SIGNING_REQUIRED=NO \
-  CODE_SIGN_IDENTITY="" \
+  CODE_SIGN_IDENTITY=- \
+  CODE_SIGNING_REQUIRED=YES \
+  CODE_SIGNING_ALLOWED=YES \
   build
 
 if [[ ! -d "$APP_PATH" ]]; then
@@ -56,9 +56,14 @@ mkdir -p "$DIST_DIR"
 rm -rf "$ROOT_APP_PATH"
 rsync -a "$APP_PATH/" "$ROOT_APP_PATH/"
 
+if ! codesign --verify --deep --strict "$ROOT_APP_PATH" >/dev/null 2>&1; then
+  echo "Distribution app signature verification failed at: $ROOT_APP_PATH"
+  exit 1
+fi
+
 rm -f "$ZIP_PATH"
 ditto -c -k --sequesterRsrc --keepParent "$ROOT_APP_PATH" "$ZIP_PATH"
 
-echo "Unsigned app: $ROOT_APP_PATH"
+echo "Ad-hoc signed app: $ROOT_APP_PATH"
 echo "Distributable zip: $ZIP_PATH"
-echo "Expected behavior: macOS will warn that the app cannot be verified."
+echo "Expected behavior: macOS may warn the app is from an unidentified developer."
