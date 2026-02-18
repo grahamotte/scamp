@@ -7,28 +7,34 @@ struct TransportControlsView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            controlButton(icon: "eject.fill") {
+            TransportControlButton(icon: "eject.fill", buttonDiameter: buttonDiameter, iconSize: iconSize) {
                 playback.loadFolder()
             }
 
-            controlButton(icon: "backward.fill") {
+            TransportControlButton(icon: "backward.fill", buttonDiameter: buttonDiameter, iconSize: iconSize) {
                 playback.playPrevious()
             }
 
-            controlButton(icon: "playpause.fill", showsPressDepth: true) {
+            TransportControlButton(icon: "playpause.fill", buttonDiameter: buttonDiameter, iconSize: iconSize) {
                 playback.togglePlayPause()
             }
 
-            controlButton(icon: "forward.fill") {
+            TransportControlButton(icon: "forward.fill", buttonDiameter: buttonDiameter, iconSize: iconSize) {
                 playback.playNext()
             }
         }
         .padding(.horizontal, 20)
         .frame(maxWidth: .infinity)
     }
+}
 
-    @ViewBuilder
-    private func controlButton(icon: String, showsPressDepth: Bool = false, action: @escaping () -> Void) -> some View {
+private struct TransportControlButton: View {
+    let icon: String
+    let buttonDiameter: CGFloat
+    let iconSize: CGFloat
+    let action: () -> Void
+
+    var body: some View {
         Button {
             ControlClickSoundPlayer.shared.play()
             action()
@@ -38,8 +44,7 @@ struct TransportControlsView: View {
         .buttonStyle(
             PhysicalTransportButtonStyle(
                 buttonDiameter: buttonDiameter,
-                iconSize: iconSize,
-                showsPressDepth: showsPressDepth
+                iconSize: iconSize
             )
         )
         .frame(maxWidth: .infinity)
@@ -49,12 +54,11 @@ struct TransportControlsView: View {
 private struct PhysicalTransportButtonStyle: ButtonStyle {
     let buttonDiameter: CGFloat
     let iconSize: CGFloat
-    let showsPressDepth: Bool
 
     func makeBody(configuration: Configuration) -> some View {
-        let centerOffset = showsPressDepth && configuration.isPressed ? buttonDiameter * 0.05 : 0
-        let centerShadowRadius = showsPressDepth && configuration.isPressed ? buttonDiameter * 0.02 : buttonDiameter * 0.08
-        let centerShadowY = showsPressDepth && configuration.isPressed ? buttonDiameter * 0.02 : buttonDiameter * 0.05
+        let centerOffset = configuration.isPressed ? buttonDiameter * 0.05 : 0
+        let centerShadowRadius = configuration.isPressed ? buttonDiameter * 0.02 : buttonDiameter * 0.08
+        let centerShadowY = configuration.isPressed ? buttonDiameter * 0.02 : buttonDiameter * 0.05
 
         return ZStack {
             Circle()
