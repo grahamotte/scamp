@@ -5,7 +5,18 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DERIVED_DATA_PATH="$ROOT_DIR/.build/xcode-dist"
 DIST_DIR="$ROOT_DIR/dist"
 ROOT_APP_PATH="$DIST_DIR/Scamp.app"
-ZIP_PATH="$DIST_DIR/Scamp-macOS-unsigned.zip"
+
+if ! command -v git >/dev/null 2>&1; then
+  echo "git is required to build distribution artifacts with commit hash in filename."
+  exit 1
+fi
+
+if ! GIT_SHORT_HASH="$(git -C "$ROOT_DIR" rev-parse --short HEAD 2>/dev/null)"; then
+  echo "Could not determine git short hash for $ROOT_DIR"
+  exit 1
+fi
+
+ZIP_PATH="$DIST_DIR/Scamp-macOS-unsigned-$GIT_SHORT_HASH.zip"
 
 if [[ -d "$ROOT_DIR/Scamp.xcodeproj" ]]; then
   PROJECT_PATH="$ROOT_DIR/Scamp.xcodeproj"
