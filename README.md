@@ -21,7 +21,8 @@ small, fast, and focused.
 ## Record Folder Format
 
 - Keep songs in alphabetical order by filename.
-- Include exactly 1 cover image named `cover.jpg`.
+- Include at least 1 image file (for example `cover.jpg`).
+- If you dont ahve any music files to try with, you can grab some here: [Bandcamp Discover](https://bandcamp.com/discover/pay-what-you-want).
 
 ## Development
 
