@@ -17,11 +17,14 @@ struct RecordAreaPlaceholderView: View {
 
         TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: playback.turntableSpeed <= 0.0001)) { context in
             let rotationDegrees = rotationDegrees(at: context.date)
+            let centerPegDiameter = playback.hasPlaylist ? max(5, size * 0.02) : max(5, size * 0.018)
 
             ZStack {
                 recordSurface(for: geometry)
                     .frame(width: size, height: size)
                     .rotationEffect(.degrees(rotationDegrees))
+
+                centerPeg(diameter: centerPegDiameter)
             }
         }
         .frame(width: size, height: size)
@@ -132,13 +135,6 @@ struct RecordAreaPlaceholderView: View {
                     }
                 }
 
-            Circle()
-                .fill(Color.black.opacity(0.9))
-                .frame(width: max(5, size * 0.02), height: max(5, size * 0.02))
-                .overlay(
-                    Circle()
-                        .stroke(Color.white.opacity(0.4), lineWidth: 1)
-                )
         }
     }
 
@@ -159,13 +155,47 @@ struct RecordAreaPlaceholderView: View {
                         .stroke(Color.white.opacity(0.08), lineWidth: max(1, size * 0.0023))
                 )
 
+        }
+    }
+
+    private func centerPeg(diameter: CGFloat) -> some View {
+        let bufferRingWidth = max(0.32, diameter * 0.045)
+        let bufferRingDiameter = diameter + bufferRingWidth
+
+        return ZStack {
             Circle()
-                .fill(Color.black.opacity(0.9))
-                .frame(width: max(5, size * 0.018), height: max(5, size * 0.018))
+                .stroke(bufferBandColor.opacity(0.94), lineWidth: bufferRingWidth)
+                .frame(width: bufferRingDiameter, height: bufferRingDiameter)
                 .overlay(
                     Circle()
-                        .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                        .stroke(Color.white.opacity(0.08), lineWidth: max(0.2, bufferRingWidth * 0.45))
+                        .frame(width: bufferRingDiameter, height: bufferRingDiameter)
                 )
+
+            Circle()
+                .fill(
+                    LinearGradient(
+                        colors: [Color(white: 0.93), Color(white: 0.66), Color(white: 0.84)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .frame(width: diameter, height: diameter)
+                .overlay(
+                    Circle()
+                        .stroke(Color.white.opacity(0.55), lineWidth: max(0.6, diameter * 0.08))
+                )
+                .overlay(
+                    Circle()
+                        .stroke(Color.black.opacity(0.24), lineWidth: max(0.5, diameter * 0.06))
+                )
+                .overlay(
+                    Circle()
+                        .fill(Color.white.opacity(0.46))
+                        .frame(width: diameter * 0.34, height: diameter * 0.34)
+                        .offset(x: -diameter * 0.16, y: -diameter * 0.16)
+                )
+                .shadow(color: .black.opacity(0.22), radius: max(0.8, diameter * 0.14), x: 0, y: max(0.5, diameter * 0.08))
         }
     }
 
