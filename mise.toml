@@ -1,10 +1,10 @@
 [tasks.build]
 description = "Build Scamp and publish /Scamp.app"
-run = "./scripts/build-macos.sh"
+run = "SCAMP_OPEN_FINDER=1 ./scripts/build-macos.sh"
 
 [tasks.dist]
 description = "Build unsigned Release app and package a distributable zip"
-run = "./scripts/build-distribution.sh"
+run = "SCAMP_OPEN_DIST_FINDER=1 ./scripts/build-distribution.sh"
 
 [tasks.start]
 description = "Stop running app, clean old builds, rebuild, copy to root, and launch"

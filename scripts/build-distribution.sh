@@ -67,3 +67,8 @@ ditto -c -k --sequesterRsrc --keepParent "$ROOT_APP_PATH" "$ZIP_PATH"
 echo "Ad-hoc signed app: $ROOT_APP_PATH"
 echo "Distributable zip: $ZIP_PATH"
 echo "Expected behavior: macOS may warn the app is from an unidentified developer."
+
+if [[ "${SCAMP_OPEN_DIST_FINDER:-0}" == "1" ]]; then
+  echo "Opening Finder at dist folder..."
+  open "$DIST_DIR"
+fi
