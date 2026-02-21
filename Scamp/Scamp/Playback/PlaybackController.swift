@@ -14,6 +14,9 @@ final class PlaybackController: ObservableObject {
     private static let spinUpDuration: TimeInterval = 1.6
     private static let spinDownDuration: TimeInterval = 2.0
     private static let spinRecoveryDuration: TimeInterval = 0.8
+    private static let recordHoldRampDownDuration: TimeInterval = 0.12
+    private static let recordHoldRampUpDuration: TimeInterval = 0.16
+    private static let recordHoldSlowMultiplier: Double = 0.5
     private static let minimumPlaybackRate: Double = 0.5
     private static let playbackRateCurveExponent: Double = 1.9
     private static let playbackVolumeCurveExponent: Double = 0.8
@@ -31,8 +34,12 @@ final class PlaybackController: ObservableObject {
     private let engine: AudioPlayerEngine
     private var securityScopedFolderURL: URL?
     private var spinRampTask: Task<Void, Never>?
+    private var recordHoldRampTask: Task<Void, Never>?
     private var progressTask: Task<Void, Never>?
     private var pendingSpinDownAction: SpinDownAction = .none
+    private var baseTurntableSpeed: Double = 0
+    private var recordHoldMultiplier: Double = 1
+    private var isRecordHoldActive = false
 
     init(loader: PlaylistLoader, engine: AudioPlayerEngine) {
         self.loader = loader
@@ -46,6 +53,7 @@ final class PlaybackController: ObservableObject {
 
     deinit {
         spinRampTask?.cancel()
+        recordHoldRampTask?.cancel()
         progressTask?.cancel()
 
         if let folderURL = securityScopedFolderURL {
@@ -142,8 +150,8 @@ final class PlaybackController: ObservableObject {
                 pendingSpinDownAction = .none
                 engine.seek(to: offsetInTrack)
                 engine.resume(
-                    rate: playbackRate(for: turntableSpeed),
-                    volume: playbackVolume(for: turntableSpeed)
+                    rate: currentPlaybackRate,
+                    volume: currentPlaybackVolume
                 )
                 isPlaying = true
                 syncProgressTask()
@@ -161,6 +169,16 @@ final class PlaybackController: ObservableObject {
             }
             return
         }
+    }
+
+    func setRecordHoldActive(_ isActive: Bool) {
+        guard isRecordHoldActive != isActive else { return }
+        isRecordHoldActive = isActive
+
+        rampRecordHoldMultiplier(
+            to: isActive ? Self.recordHoldSlowMultiplier : 1,
+            duration: isActive ? Self.recordHoldRampDownDuration : Self.recordHoldRampUpDuration
+        )
     }
 
     func loadFolder() {
@@ -201,8 +219,8 @@ final class PlaybackController: ObservableObject {
             isPlaying = true
             syncProgressTask()
             engine.resume(
-                rate: playbackRate(for: turntableSpeed),
-                volume: playbackVolume(for: turntableSpeed)
+                rate: currentPlaybackRate,
+                volume: currentPlaybackVolume
             )
             updatePlaylistProgress(allowBackwardJump: true)
             if !isTurntableMoving {
@@ -321,6 +339,7 @@ final class PlaybackController: ObservableObject {
 
     private func finishStopPlayback(clearSelection: Bool) {
         cancelSpinRamp()
+        resetRecordHoldState()
         pendingSpinDownAction = .none
         engine.stop()
         isPlaying = false
@@ -345,8 +364,8 @@ final class PlaybackController: ObservableObject {
 
         let track = playlist[index]
         let shouldRampFromRest = !preserveMomentum
-        let startRate = shouldRampFromRest ? playbackRate(for: 0) : 1
-        let startVolume = shouldRampFromRest ? playbackVolume(for: 0) : 1
+        let startRate = shouldRampFromRest ? playbackRate(for: 0) : currentPlaybackRate
+        let startVolume = shouldRampFromRest ? playbackVolume(for: 0) : currentPlaybackVolume
 
         do {
             cancelSpinRamp()
@@ -362,7 +381,7 @@ final class PlaybackController: ObservableObject {
             if shouldRampFromRest {
                 setTurntableSpeed(0)
                 rampTurntable(to: 1, duration: Self.spinUpDuration, completionAction: .none)
-            } else if turntableSpeed < 1 {
+            } else if baseTurntableSpeed < 1 {
                 rampTurntable(
                     to: 1,
                     duration: Self.spinRecoveryDuration,
@@ -419,7 +438,7 @@ final class PlaybackController: ObservableObject {
         pendingSpinDownAction = completionAction
 
         let clampedTargetSpeed = min(max(targetSpeed, 0), 1)
-        let startingSpeed = min(max(turntableSpeed, 0), 1)
+        let startingSpeed = min(max(baseTurntableSpeed, 0), 1)
 
         guard duration > 0 else {
             setTurntableSpeed(clampedTargetSpeed)
@@ -483,13 +502,71 @@ final class PlaybackController: ObservableObject {
         spinRampTask = nil
     }
 
+    private func rampRecordHoldMultiplier(to targetMultiplier: Double, duration: TimeInterval) {
+        cancelRecordHoldRamp()
+
+        let clampedTargetMultiplier = min(max(targetMultiplier, Self.recordHoldSlowMultiplier), 1)
+        let startingMultiplier = min(max(recordHoldMultiplier, Self.recordHoldSlowMultiplier), 1)
+
+        guard duration > 0 else {
+            setRecordHoldMultiplier(clampedTargetMultiplier)
+            return
+        }
+
+        recordHoldRampTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+
+            let startDate = Date()
+            while !Task.isCancelled {
+                let elapsed = Date().timeIntervalSince(startDate)
+                let progress = min(max(elapsed / duration, 0), 1)
+                let easedProgress = self.easeInOut(progress)
+                let nextMultiplier = startingMultiplier + ((clampedTargetMultiplier - startingMultiplier) * easedProgress)
+                self.setRecordHoldMultiplier(nextMultiplier)
+
+                if progress >= 1 {
+                    break
+                }
+
+                do {
+                    try await Task.sleep(nanoseconds: Self.rampFrameNanoseconds)
+                } catch {
+                    return
+                }
+            }
+
+            self.setRecordHoldMultiplier(clampedTargetMultiplier)
+            self.recordHoldRampTask = nil
+        }
+    }
+
+    private func cancelRecordHoldRamp() {
+        recordHoldRampTask?.cancel()
+        recordHoldRampTask = nil
+    }
+
+    private func resetRecordHoldState() {
+        isRecordHoldActive = false
+        cancelRecordHoldRamp()
+        recordHoldMultiplier = 1
+    }
+
+    private func setRecordHoldMultiplier(_ multiplier: Double) {
+        recordHoldMultiplier = min(max(multiplier, Self.recordHoldSlowMultiplier), 1)
+        applyTurntableState()
+    }
+
     private func setTurntableSpeed(_ speed: Double) {
-        let clampedSpeed = min(max(speed, 0), 1)
-        turntableSpeed = clampedSpeed
+        baseTurntableSpeed = min(max(speed, 0), 1)
+        applyTurntableState()
+    }
+
+    private func applyTurntableState() {
+        turntableSpeed = effectiveTurntableSpeed
 
         guard isPlaying, engine.hasLoadedTrack else { return }
-        engine.setPlaybackRate(playbackRate(for: clampedSpeed))
-        engine.setPlaybackVolume(playbackVolume(for: clampedSpeed))
+        engine.setPlaybackRate(currentPlaybackRate)
+        engine.setPlaybackVolume(currentPlaybackVolume)
     }
 
     private func updatePlaylistProgress(allowBackwardJump: Bool = false) {
@@ -553,6 +630,20 @@ final class PlaybackController: ObservableObject {
 
     private var isTurntableMoving: Bool {
         turntableSpeed > Self.movingThreshold
+    }
+
+    private var effectiveTurntableSpeed: Double {
+        min(max(baseTurntableSpeed * recordHoldMultiplier, 0), 1)
+    }
+
+    private var currentPlaybackRate: Float {
+        let baseRate = playbackRate(for: baseTurntableSpeed)
+        let scaledRate = max(Float(Self.minimumPlaybackRate), baseRate * Float(recordHoldMultiplier))
+        return scaledRate
+    }
+
+    private var currentPlaybackVolume: Float {
+        playbackVolume(for: effectiveTurntableSpeed)
     }
 
     private var isSpinDownPendingPause: Bool {

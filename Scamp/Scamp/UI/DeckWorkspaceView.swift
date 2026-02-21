@@ -4,6 +4,7 @@ struct DeckWorkspaceView: View {
     @ObservedObject var playback: PlaybackController
     @State private var scrubDragProgress: Double?
     @State private var showsTonearmDebugGuides = false
+    @State private var isRecordHoldGestureActive = false
 
     private var bottomBarTitle: String {
         if playback.isPlaying, let currentTrackDisplayName = playback.currentTrackDisplayName {
@@ -30,6 +31,19 @@ struct DeckWorkspaceView: View {
                                 .frame(width: chromeInset)
 
                             RecordAreaPlaceholderView(size: squareSize, playback: playback)
+                                .contentShape(Circle())
+                                .gesture(
+                                    DragGesture(minimumDistance: 0)
+                                        .onChanged { _ in
+                                            guard !isRecordHoldGestureActive else { return }
+                                            isRecordHoldGestureActive = true
+                                            playback.setRecordHoldActive(true)
+                                        }
+                                        .onEnded { _ in
+                                            isRecordHoldGestureActive = false
+                                            playback.setRecordHoldActive(false)
+                                        }
+                                )
 
                             ControlsAreaView(
                                 width: controlsWidth,
@@ -69,6 +83,12 @@ struct DeckWorkspaceView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onDisappear {
+            if isRecordHoldGestureActive {
+                isRecordHoldGestureActive = false
+                playback.setRecordHoldActive(false)
+            }
+        }
     }
 }
 
