@@ -2,6 +2,7 @@ import SwiftUI
 
 struct DeckWorkspaceView: View {
     @ObservedObject var playback: PlaybackController
+    @Binding var tableTheme: TableTheme
     @State private var scrubDragProgress: Double?
     @State private var showsTonearmDebugGuides = false
     @State private var isRecordHoldGestureActive = false
@@ -15,7 +16,7 @@ struct DeckWorkspaceView: View {
 
     var body: some View {
         ZStack {
-            WoodGrainBackground()
+            TableThemeBackground(theme: tableTheme)
                 .ignoresSafeArea()
 
             GeometryReader { geometry in
