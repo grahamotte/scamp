@@ -49,15 +49,19 @@ struct FrostedGlassTableBackground: View {
 private struct PersistentFrostedBackdrop: NSViewRepresentable {
     func makeNSView(context: Context) -> NSVisualEffectView {
         let view = NSVisualEffectView(frame: .zero)
-        view.blendingMode = .behindWindow
-        view.material = .underWindowBackground
-        view.state = .active
-        view.alphaValue = 0.82
+        configure(view)
         return view
     }
 
     func updateNSView(_ nsView: NSVisualEffectView, context: Context) {
-        nsView.state = .active
-        nsView.alphaValue = 0.82
+        configure(nsView)
+    }
+
+    private func configure(_ view: NSVisualEffectView) {
+        view.blendingMode = .behindWindow
+        view.material = .menu
+        view.state = .active
+        view.isEmphasized = false
+        view.maskImage = nil
     }
 }
