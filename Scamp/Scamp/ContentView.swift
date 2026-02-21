@@ -13,7 +13,7 @@ struct ContentView: View {
             DeckWorkspaceView(playback: playback, tableTheme: $tableTheme)
         }
         .navigationSplitViewStyle(.balanced)
-        .containerBackground(.thinMaterial, for: .window)
+        .containerBackground(Color.clear, for: .window)
         .toolbar(removing: .sidebarToggle)
         .background(TitlebarSidebarButtonHider())
         .background(ThemeWindowConfigurator())

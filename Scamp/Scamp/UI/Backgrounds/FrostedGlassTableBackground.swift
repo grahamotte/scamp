@@ -1,8 +1,11 @@
+import AppKit
 import SwiftUI
 
 struct FrostedGlassTableBackground: View {
     var body: some View {
         ZStack {
+            PersistentFrostedBackdrop()
+
             LinearGradient(
                 colors: [
                     Color(red: 0.91, green: 0.94, blue: 0.98),
@@ -12,10 +15,10 @@ struct FrostedGlassTableBackground: View {
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
-            .opacity(0.08)
+            .opacity(0.03)
 
             Rectangle()
-                .fill(Color.white.opacity(0.015))
+                .fill(Color.white.opacity(0.003))
 
             LinearGradient(
                 colors: [
@@ -26,7 +29,7 @@ struct FrostedGlassTableBackground: View {
                 startPoint: .top,
                 endPoint: .bottom
             )
-            .opacity(0.45)
+            .opacity(0.14)
 
             LinearGradient(
                 colors: [
@@ -38,7 +41,23 @@ struct FrostedGlassTableBackground: View {
                 endPoint: .bottomTrailing
             )
             .blendMode(.screen)
-            .opacity(0.35)
+            .opacity(0.12)
         }
+    }
+}
+
+private struct PersistentFrostedBackdrop: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView(frame: .zero)
+        view.blendingMode = .behindWindow
+        view.material = .underWindowBackground
+        view.state = .active
+        view.alphaValue = 0.82
+        return view
+    }
+
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {
+        nsView.state = .active
+        nsView.alphaValue = 0.82
     }
 }
