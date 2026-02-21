@@ -13,8 +13,10 @@ struct ContentView: View {
             DeckWorkspaceView(playback: playback, tableTheme: $tableTheme)
         }
         .navigationSplitViewStyle(.balanced)
+        .containerBackground(.thinMaterial, for: .window)
         .toolbar(removing: .sidebarToggle)
         .background(TitlebarSidebarButtonHider())
+        .background(ThemeWindowConfigurator())
         .frame(width: ScampLayout.windowWidth, height: ScampLayout.windowHeight)
     }
 }

@@ -225,14 +225,9 @@ private struct TonearmWorkspaceOverlay: View {
                     .frame(width: holderDiameter, height: holderDiameter)
                     .overlay(
                         Circle()
-                            .stroke(Color.white.opacity(0.55), lineWidth: max(1.2, recordDiameter * 0.002))
-                    )
-                    .overlay(
-                        Circle()
                             .stroke(Color.black.opacity(0.24), lineWidth: max(1.2, recordDiameter * 0.002))
                             .padding(holderDiameter * 0.08)
                     )
-                    .shadow(color: .black.opacity(0.3), radius: 8, x: 0, y: 4)
                     .position(pivotPoint)
 
                 armPath

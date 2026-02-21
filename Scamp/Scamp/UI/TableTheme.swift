@@ -2,7 +2,7 @@ import SwiftUI
 
 enum TableTheme: String, CaseIterable, Identifiable {
     case wood
-    case silver
+    case frostedGlass
 
     var id: String { rawValue }
 
@@ -10,8 +10,17 @@ enum TableTheme: String, CaseIterable, Identifiable {
         switch self {
         case .wood:
             return "Wood"
-        case .silver:
-            return "Silver"
+        case .frostedGlass:
+            return "Frosted Glass"
+        }
+    }
+
+    var usesWindowTranslucency: Bool {
+        switch self {
+        case .wood:
+            return false
+        case .frostedGlass:
+            return true
         }
     }
 }
@@ -23,8 +32,8 @@ struct TableThemeBackground: View {
         switch theme {
         case .wood:
             WoodGrainBackground()
-        case .silver:
-            SilverTableBackground()
+        case .frostedGlass:
+            FrostedGlassTableBackground()
         }
     }
 }
