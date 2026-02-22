@@ -7,13 +7,6 @@ struct DeckWorkspaceView: View {
     @State private var showsTonearmDebugGuides = false
     @State private var isRecordHoldGestureActive = false
 
-    private var bottomBarTitle: String {
-        if playback.isPlaying, let currentTrackDisplayName = playback.currentTrackDisplayName {
-            return currentTrackDisplayName
-        }
-        return ScampLayout.statusFallbackTitle
-    }
-
     var body: some View {
         ZStack {
             TableThemeBackground(theme: tableTheme)
@@ -49,6 +42,7 @@ struct DeckWorkspaceView: View {
                             ControlsAreaView(
                                 width: controlsWidth,
                                 height: squareSize,
+                                edgeInset: chromeInset,
                                 playback: playback
                             )
                         }
@@ -75,10 +69,9 @@ struct DeckWorkspaceView: View {
                     }
                     .frame(width: geometry.size.width, height: squareSize, alignment: .topLeading)
 
-                    BottomStatusBarView(
-                        title: bottomBarTitle,
-                        height: chromeInset
-                    )
+                    Color.clear
+                        .frame(maxWidth: .infinity)
+                        .frame(height: chromeInset)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }

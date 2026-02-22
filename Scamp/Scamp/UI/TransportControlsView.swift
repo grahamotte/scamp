@@ -2,11 +2,12 @@ import SwiftUI
 
 struct TransportControlsView: View {
     @ObservedObject var playback: PlaybackController
+    let buttonSpacing: CGFloat
     private let buttonDiameter: CGFloat = 40
     private let iconSize: CGFloat = 11
 
     var body: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: buttonSpacing) {
             TransportControlButton(icon: "eject.fill", buttonDiameter: buttonDiameter, iconSize: iconSize) {
                 playback.loadFolder()
             }
@@ -23,8 +24,6 @@ struct TransportControlsView: View {
                 playback.playNext()
             }
         }
-        .padding(.horizontal, 20)
-        .frame(maxWidth: .infinity)
     }
 }
 
@@ -47,7 +46,6 @@ private struct TransportControlButton: View {
                 iconSize: iconSize
             )
         )
-        .frame(maxWidth: .infinity)
     }
 }
 
