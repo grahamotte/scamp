@@ -251,7 +251,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1.2.5;
+				CURRENT_PROJECT_VERSION = 1.2.6;
 				DEVELOPMENT_TEAM = 3QCHM255VF;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_PREVIEWS = YES;
@@ -266,7 +266,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.2.5;
+				MARKETING_VERSION = 1.2.6;
 				PRODUCT_BUNDLE_IDENTIFIER = com.grahamotte.scamp;
 				PRODUCT_NAME = "Scamp Micro Deck";
 				EXECUTABLE_NAME = ScampMicroDeck;
@@ -288,7 +288,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1.2.5;
+				CURRENT_PROJECT_VERSION = 1.2.6;
 				DEVELOPMENT_TEAM = 3QCHM255VF;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_PREVIEWS = YES;
@@ -303,7 +303,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.2.5;
+				MARKETING_VERSION = 1.2.6;
 				PRODUCT_BUNDLE_IDENTIFIER = com.grahamotte.scamp;
 				PRODUCT_NAME = "Scamp Micro Deck";
 				EXECUTABLE_NAME = ScampMicroDeck;
