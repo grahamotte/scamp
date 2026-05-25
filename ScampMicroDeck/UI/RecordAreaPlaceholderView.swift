@@ -41,44 +41,59 @@ struct RecordAreaPlaceholderView: View, Equatable {
 
     var body: some View {
         let geometry = layout.resolved(forDiameter: size)
+        let centerPegDiameter = hasPlaylist ? max(5, size * 0.02) : max(5, size * 0.018)
+        let divisionRadii = hasPlaylist ? trackDivisionRadii(in: geometry) : []
+        let surface = recordSurface(for: geometry, trackDivisionRadii: divisionRadii)
 
-        TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: turntableSpeed <= 0.0001)) { context in
-            let rotationDegrees = playback.recordRotationDegrees(at: context.date)
-            let centerPegDiameter = hasPlaylist ? max(5, size * 0.02) : max(5, size * 0.018)
+        Group {
+            if hasPlaylist {
+                TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: turntableSpeed <= 0.0001)) { context in
+                    let rotationDegrees = playback.recordRotationDegrees(at: context.date)
 
-            ZStack {
-                recordSurface(for: geometry, rotationDegrees: rotationDegrees)
-                    .frame(width: size, height: size)
-                    .rotationEffect(.degrees(rotationDegrees))
-                    .transaction { transaction in
-                        transaction.animation = nil
+                    ZStack {
+                        surface
+                            .id(surfaceCacheKey)
+                            .frame(width: size, height: size)
+                            .drawingGroup(opaque: false, colorMode: .linear)
+                            .rotationEffect(.degrees(rotationDegrees))
+                            .transaction { transaction in
+                                transaction.animation = nil
+                            }
                     }
-
-                centerPeg(diameter: centerPegDiameter)
+                }
+            } else {
+                surface
+                    .id(surfaceCacheKey)
+                    .frame(width: size, height: size)
             }
         }
         .frame(width: size, height: size)
-    }
-
-    @ViewBuilder
-    private func recordSurface(for geometry: VinylRecordGeometry, rotationDegrees: Double) -> some View {
-        if hasPlaylist {
-            loadedRecordSurface(for: geometry, rotationDegrees: rotationDegrees)
-        } else {
-            emptyRecordSurface(rotationDegrees: rotationDegrees)
+        .overlay {
+            recordLightingOverlay(for: geometry)
+        }
+        .overlay {
+            centerPeg(diameter: centerPegDiameter)
         }
     }
 
     @ViewBuilder
-    private func loadedRecordSurface(for geometry: VinylRecordGeometry, rotationDegrees: Double) -> some View {
+    private func recordSurface(for geometry: VinylRecordGeometry, trackDivisionRadii: [CGFloat]) -> some View {
+        if hasPlaylist {
+            loadedRecordSurface(for: geometry, trackDivisionRadii: trackDivisionRadii)
+        } else {
+            emptyRecordSurface()
+        }
+    }
+
+    @ViewBuilder
+    private func loadedRecordSurface(for geometry: VinylRecordGeometry, trackDivisionRadii: [CGFloat]) -> some View {
         if theme == .black {
             BlackRecordTheme.loadedSurface(
                 size: size,
                 geometry: geometry,
-                trackDivisionRadii: trackDivisionRadii(in: geometry),
+                trackDivisionRadii: trackDivisionRadii,
                 albumArtImage: albumArtImage,
-                currentTrackDisplayName: currentTrackDisplayName,
-                rotationDegrees: rotationDegrees
+                currentTrackDisplayName: currentTrackDisplayName
             )
         } else {
             ZStack {
@@ -134,7 +149,7 @@ struct RecordAreaPlaceholderView: View, Equatable {
                     .frame(width: grooveRadius * 2, height: grooveRadius * 2)
             }
 
-            ForEach(Array(trackDivisionRadii(in: geometry).enumerated()), id: \.offset) { _, radius in
+            ForEach(Array(trackDivisionRadii.enumerated()), id: \.offset) { _, radius in
                 Circle()
                     .stroke(palette.trackDividerColor.opacity(0.6), lineWidth: max(0.6, size * 0.0018))
                     .frame(width: radius * 2, height: radius * 2)
@@ -192,9 +207,9 @@ struct RecordAreaPlaceholderView: View, Equatable {
     }
 
     @ViewBuilder
-    private func emptyRecordSurface(rotationDegrees: Double) -> some View {
+    private func emptyRecordSurface() -> some View {
         if theme == .black {
-            BlackRecordTheme.emptySurface(size: size, rotationDegrees: rotationDegrees)
+            BlackRecordTheme.emptySurface(size: size)
         } else {
             ZStack {
             Circle()
@@ -213,6 +228,15 @@ struct RecordAreaPlaceholderView: View, Equatable {
                     Circle()
                         .stroke(unloadedBackdropTrackColor.opacity(0.34), lineWidth: max(1, size * 0.0023))
                 )
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func recordLightingOverlay(for geometry: VinylRecordGeometry) -> some View {
+        if theme == .black {
+            if hasPlaylist {
+                BlackRecordTheme.loadedLightingOverlay(size: size, geometry: geometry)
             }
         }
     }
@@ -279,6 +303,26 @@ struct RecordAreaPlaceholderView: View, Equatable {
         }
     }
 
+    private var surfaceCacheKey: RecordSurfaceCacheKey {
+        RecordSurfaceCacheKey(
+            size: size,
+            theme: theme,
+            hasPlaylist: hasPlaylist,
+            albumArtIdentifier: albumArtIdentifier,
+            currentTrackDisplayName: currentTrackDisplayName,
+            trackDurations: trackDurations
+        )
+    }
+
+}
+
+private struct RecordSurfaceCacheKey: Hashable {
+    let size: CGFloat
+    let theme: RecordTheme
+    let hasPlaylist: Bool
+    let albumArtIdentifier: ObjectIdentifier?
+    let currentTrackDisplayName: String?
+    let trackDurations: [TimeInterval]
 }
 
 struct VinylRecordLayout {

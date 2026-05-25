@@ -13,21 +13,23 @@ struct BlackRecordTheme: RecordThemeDefinition {
         geometry: VinylRecordGeometry,
         trackDivisionRadii: [CGFloat],
         albumArtImage: NSImage?,
-        currentTrackDisplayName: String?,
-        rotationDegrees: Double
+        currentTrackDisplayName: String?
     ) -> some View {
         BlackLoadedRecordSurface(
             size: size,
             geometry: geometry,
             trackDivisionRadii: trackDivisionRadii,
             albumArtImage: albumArtImage,
-            currentTrackDisplayName: currentTrackDisplayName,
-            rotationDegrees: rotationDegrees
+            currentTrackDisplayName: currentTrackDisplayName
         )
     }
 
-    static func emptySurface(size: CGFloat, rotationDegrees: Double) -> some View {
-        BlackEmptyRecordSurface(size: size, rotationDegrees: rotationDegrees)
+    static func emptySurface(size: CGFloat) -> some View {
+        BlackEmptyRecordSurface(size: size)
+    }
+
+    static func loadedLightingOverlay(size: CGFloat, geometry: VinylRecordGeometry) -> some View {
+        BlackLoadedRecordLightingOverlay(size: size, geometry: geometry)
     }
 
     static func centerPeg(diameter: CGFloat, bufferColor: Color) -> some View {
@@ -41,103 +43,36 @@ private struct BlackLoadedRecordSurface: View {
     let trackDivisionRadii: [CGFloat]
     let albumArtImage: NSImage?
     let currentTrackDisplayName: String?
-    let rotationDegrees: Double
 
     var body: some View {
-        ThemeLightReader { light in
-            let localLight = light.rotated(by: .degrees(-rotationDegrees))
-            let trackBandWidth = geometry.trackBandRadiusBounds.upperBound - geometry.trackBandRadiusBounds.lowerBound
-
-            ZStack {
-                Circle()
-                    .fill(
-                        RadialGradient(
-                            colors: [
-                                Color(white: 0.105),
-                                Color(white: 0.030),
-                                Color(white: 0.006)
-                            ],
-                            center: localLight.radialCenter,
-                            startRadius: size * 0.04,
-                            endRadius: size * 0.55
-                        )
+        ZStack {
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [
+                            Color(white: 0.050),
+                            Color(white: 0.020),
+                            Color(white: 0.006)
+                        ],
+                        center: .center,
+                        startRadius: size * 0.04,
+                        endRadius: size * 0.55
                     )
-                    .clipShape(Circle())
-
-                BlackVinylArcTexture(
-                    innerRadius: geometry.trackBandRadiusBounds.lowerBound,
-                    outerRadius: geometry.trackBandRadiusBounds.upperBound
                 )
                 .clipShape(Circle())
-                .blendMode(.screen)
 
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.12),
-                                Color.clear,
-                                Color.black.opacity(0.30)
-                            ],
-                            startPoint: localLight.start,
-                            endPoint: localLight.end
-                        )
-                    )
-                    .blendMode(.softLight)
+            BlackVinylGrooveCanvas(
+                size: size,
+                geometry: geometry,
+                trackDivisionRadii: trackDivisionRadii
+            )
 
-                Circle()
-                    .stroke(Color.white.opacity(0.08), lineWidth: max(1, size * 0.002))
-                    .padding(size * 0.004)
-
-                Circle()
-                    .stroke(Color(white: 0.055), style: StrokeStyle(lineWidth: max(1, geometry.outerBufferWidth)))
-                    .frame(
-                        width: (geometry.trackBandOuterRadius + (geometry.outerBufferWidth / 2)) * 2,
-                        height: (geometry.trackBandOuterRadius + (geometry.outerBufferWidth / 2)) * 2
-                    )
-
-                ForEach(0..<96, id: \.self) { grooveIndex in
-                    let fraction = CGFloat(grooveIndex) / 95
-                    let grooveRadius = geometry.trackBandRadiusBounds.upperBound - (trackBandWidth * fraction)
-                    Circle()
-                        .stroke(
-                            Color.white.opacity(grooveIndex.isMultiple(of: 8) ? 0.16 : 0.075),
-                            lineWidth: grooveIndex.isMultiple(of: 8) ? 0.65 : 0.38
-                        )
-                        .frame(width: grooveRadius * 2, height: grooveRadius * 2)
-                }
-
-                ForEach(Array(trackDivisionRadii.enumerated()), id: \.offset) { _, radius in
-                    Circle()
-                        .stroke(
-                            LinearGradient(
-                                colors: [
-                                    Color.white.opacity(0.12),
-                                    Color.white.opacity(0.055),
-                                    Color.black.opacity(0.10)
-                                ],
-                                startPoint: localLight.start,
-                                endPoint: localLight.end
-                            ),
-                            lineWidth: max(0.55, size * 0.00135)
-                        )
-                        .frame(width: radius * 2, height: radius * 2)
-                }
-
-                Circle()
-                    .stroke(Color(white: 0.055), style: StrokeStyle(lineWidth: max(1, geometry.innerBufferWidth)))
-                    .frame(
-                        width: (geometry.labelRadius + (geometry.innerBufferWidth / 2)) * 2,
-                        height: (geometry.labelRadius + (geometry.innerBufferWidth / 2)) * 2
-                    )
-
-                label(localLight: localLight)
-            }
+            label()
         }
     }
 
     @ViewBuilder
-    private func label(localLight: ThemeLightDirection) -> some View {
+    private func label() -> some View {
         ZStack {
             Circle()
                 .fill(
@@ -147,22 +82,13 @@ private struct BlackLoadedRecordSurface: View {
                             Color(white: 0.055),
                             Color(white: 0.018)
                         ],
-                        center: localLight.radialCenter,
+                        center: .center,
                         startRadius: size * 0.02,
                         endRadius: geometry.labelRadius
                     )
                 )
-                .overlay(
-                    Circle()
-                        .stroke(
-                            LinearGradient(
-                                colors: [Color.white.opacity(0.20), Color.black.opacity(0.55)],
-                                startPoint: localLight.start,
-                                endPoint: localLight.end
-                            ),
-                            lineWidth: max(1, size * 0.0025)
-                        )
-                )
+                .overlay(Circle().stroke(Color.white.opacity(0.08), lineWidth: max(1, size * 0.0025)))
+                .opacity(albumArtImage == nil ? 1 : 0)
 
             if let albumArtImage {
                 Image(nsImage: albumArtImage)
@@ -170,17 +96,6 @@ private struct BlackLoadedRecordSurface: View {
                     .scaledToFill()
                     .frame(width: geometry.labelRadius * 2, height: geometry.labelRadius * 2)
                     .clipShape(Circle())
-                    .overlay(
-                        Circle()
-                            .fill(
-                                LinearGradient(
-                                    colors: [Color.white.opacity(0.08), Color.clear, Color.black.opacity(0.16)],
-                                    startPoint: localLight.start,
-                                    endPoint: localLight.end
-                                )
-                            )
-                            .blendMode(.overlay)
-                    )
             } else {
                 Text(currentTrackDisplayName ?? "SCAMP")
                     .font(.system(size: max(11, size * 0.028), weight: .semibold, design: .rounded))
@@ -196,64 +111,181 @@ private struct BlackLoadedRecordSurface: View {
 
 private struct BlackEmptyRecordSurface: View {
     let size: CGFloat
-    let rotationDegrees: Double
+
+    var body: some View {
+        let diameter = size * 0.92
+
+        ZStack {
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [
+                            Color(white: 0.080),
+                            Color(white: 0.030),
+                            Color(white: 0.010)
+                        ],
+                        center: .center,
+                        startRadius: size * 0.03,
+                        endRadius: size * 0.45
+                    )
+                )
+                .frame(width: diameter, height: diameter)
+        }
+    }
+}
+
+private struct BlackLoadedRecordLightingOverlay: View {
+    let size: CGFloat
+    let geometry: VinylRecordGeometry
 
     var body: some View {
         ThemeLightReader { light in
-            let localLight = light.rotated(by: .degrees(-rotationDegrees))
-            let diameter = size * 0.92
-
             ZStack {
+                BlackVinylLightRayCanvas(size: size, geometry: geometry, light: light)
+                    .blendMode(.screen)
+
                 Circle()
                     .fill(
                         RadialGradient(
-                            colors: [
-                                Color(white: 0.12),
-                                Color(white: 0.030),
-                                Color(white: 0.010)
-                            ],
-                            center: localLight.radialCenter,
-                            startRadius: size * 0.03,
-                            endRadius: size * 0.45
+                            colors: [Color.white.opacity(0.12), Color.clear, Color.black.opacity(0.13)],
+                            center: light.radialCenter,
+                            startRadius: size * 0.02,
+                            endRadius: size * 0.56
                         )
                     )
-                    .frame(width: diameter, height: diameter)
-
-                ForEach(0..<9, id: \.self) { ring in
-                    Circle()
-                        .stroke(
-                            Color.white.opacity(ring.isMultiple(of: 2) ? 0.09 : 0.045),
-                            lineWidth: max(0.7, size * 0.0016)
+                    .blendMode(.softLight)
+                    .mask {
+                        BlackRecordAnnulusMask(
+                            innerRadius: geometry.labelRadius,
+                            outerRadius: size / 2,
+                            referenceSize: size
                         )
-                        .frame(
-                            width: diameter * (0.28 + CGFloat(ring) * 0.075),
-                            height: diameter * (0.28 + CGFloat(ring) * 0.075)
-                        )
-                }
+                        .fill(style: FillStyle(eoFill: true))
+                    }
 
                 Circle()
                     .fill(
                         LinearGradient(
                             colors: [Color.white.opacity(0.10), Color.clear, Color.black.opacity(0.24)],
-                            startPoint: localLight.start,
-                            endPoint: localLight.end
+                            startPoint: light.start,
+                            endPoint: light.end
                         )
                     )
-                    .frame(width: diameter, height: diameter)
                     .blendMode(.softLight)
+                    .mask {
+                        BlackRecordAnnulusMask(
+                            innerRadius: geometry.labelRadius,
+                            outerRadius: size / 2,
+                            referenceSize: size
+                        )
+                        .fill(style: FillStyle(eoFill: true))
+                    }
 
                 Circle()
                     .stroke(
                         LinearGradient(
-                            colors: [Color.white.opacity(0.18), Color.black.opacity(0.50)],
-                            startPoint: localLight.start,
-                            endPoint: localLight.end
+                            colors: [Color.white.opacity(0.18), Color.black.opacity(0.45)],
+                            startPoint: light.start,
+                            endPoint: light.end
                         ),
-                        lineWidth: max(1, size * 0.003)
+                        lineWidth: max(1, size * 0.002)
                     )
-                    .frame(width: diameter, height: diameter)
+                    .padding(size * 0.004)
+
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.white.opacity(0.025), Color.clear, Color.black.opacity(0.045)],
+                            startPoint: light.start,
+                            endPoint: light.end
+                        )
+                    )
+                    .blendMode(.softLight)
+                    .frame(width: geometry.labelRadius * 2, height: geometry.labelRadius * 2)
+            }
+            .frame(width: size, height: size)
+            .clipShape(Circle())
+            .allowsHitTesting(false)
+        }
+    }
+}
+
+private struct BlackVinylLightRayCanvas: View {
+    let size: CGFloat
+    let geometry: VinylRecordGeometry
+    let light: ThemeLightDirection
+
+    var body: some View {
+        Canvas { context, canvasSize in
+            let center = CGPoint(x: canvasSize.width / 2, y: canvasSize.height / 2)
+            let scale = min(canvasSize.width, canvasSize.height) / max(size, 1)
+            let trackBandWidth = geometry.trackBandRadiusBounds.upperBound - geometry.trackBandRadiusBounds.lowerBound
+            let lightAngle = atan2(
+                Double(light.start.y - 0.5),
+                Double(light.start.x - 0.5)
+            )
+            let rayOffsets = [-0.34, 0.0, 0.42]
+
+            func scaled(_ value: CGFloat) -> CGFloat {
+                value * scale
+            }
+
+            for rayIndex in rayOffsets.indices {
+                let rayCenter = lightAngle + rayOffsets[rayIndex]
+                let raySpan = 0.16 + (Double(rayIndex) * 0.035)
+
+                for grooveIndex in stride(from: 4, to: 96, by: 3) {
+                    let fraction = CGFloat(grooveIndex) / 95
+                    let radius = geometry.trackBandRadiusBounds.upperBound - (trackBandWidth * fraction)
+                    let opacity = (grooveIndex.isMultiple(of: 12) ? 0.055 : 0.026) / Double(rayIndex + 1)
+                    let path = Path { path in
+                        path.addArc(
+                            center: center,
+                            radius: scaled(radius),
+                            startAngle: .radians(rayCenter - raySpan),
+                            endAngle: .radians(rayCenter + raySpan),
+                            clockwise: false
+                        )
+                    }
+
+                    context.stroke(
+                        path,
+                        with: .color(Color.white.opacity(opacity)),
+                        lineWidth: scaled(grooveIndex.isMultiple(of: 12) ? 0.55 : 0.32)
+                    )
+                }
             }
         }
+        .frame(width: size, height: size)
+        .allowsHitTesting(false)
+    }
+}
+
+private struct BlackRecordAnnulusMask: Shape {
+    let innerRadius: CGFloat
+    let outerRadius: CGFloat
+    let referenceSize: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        let scale = min(rect.width, rect.height) / max(referenceSize, 1)
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+        let scaledOuterRadius = outerRadius * scale
+        let scaledInnerRadius = innerRadius * scale
+
+        var path = Path()
+        path.addEllipse(in: CGRect(
+            x: center.x - scaledOuterRadius,
+            y: center.y - scaledOuterRadius,
+            width: scaledOuterRadius * 2,
+            height: scaledOuterRadius * 2
+        ))
+        path.addEllipse(in: CGRect(
+            x: center.x - scaledInnerRadius,
+            y: center.y - scaledInnerRadius,
+            width: scaledInnerRadius * 2,
+            height: scaledInnerRadius * 2
+        ))
+        return path
     }
 }
 
@@ -322,34 +354,86 @@ private struct BlackCenterPeg: View {
     }
 }
 
-private struct BlackVinylArcTexture: View {
-    let innerRadius: CGFloat
-    let outerRadius: CGFloat
+private struct BlackVinylGrooveCanvas: View {
+    let size: CGFloat
+    let geometry: VinylRecordGeometry
+    let trackDivisionRadii: [CGFloat]
 
     var body: some View {
         Canvas { context, canvasSize in
             let center = CGPoint(x: canvasSize.width / 2, y: canvasSize.height / 2)
-            let bandWidth = outerRadius - innerRadius
+            let scale = min(canvasSize.width, canvasSize.height) / max(size, 1)
+            let trackBandWidth = geometry.trackBandRadiusBounds.upperBound - geometry.trackBandRadiusBounds.lowerBound
+
+            func scaled(_ value: CGFloat) -> CGFloat {
+                value * scale
+            }
+
+            func circle(radius: CGFloat) -> Path {
+                let scaledRadius = scaled(radius)
+                return Path(ellipseIn: CGRect(
+                    x: center.x - scaledRadius,
+                    y: center.y - scaledRadius,
+                    width: scaledRadius * 2,
+                    height: scaledRadius * 2
+                ))
+            }
 
             for index in 0..<110 {
                 let unit = CGFloat(index) / 109
-                let radius = innerRadius + (bandWidth * unit)
+                let radius = geometry.trackBandRadiusBounds.lowerBound + (trackBandWidth * unit)
                 let start = Double(index) * 0.73
                 let length = 0.35 + (Double((index * 37) % 19) / 19.0) * 1.1
                 let color = index.isMultiple(of: 3)
-                    ? Color.white.opacity(0.08)
-                    : Color.black.opacity(0.18)
+                    ? Color.white.opacity(0.016)
+                    : Color.black.opacity(0.08)
                 let path = Path { path in
                     path.addArc(
                         center: center,
-                        radius: radius,
+                        radius: scaled(radius),
                         startAngle: .radians(start),
                         endAngle: .radians(start + length),
                         clockwise: false
                     )
                 }
-                context.stroke(path, with: .color(color), lineWidth: 0.45)
+                context.stroke(path, with: .color(color), lineWidth: scaled(0.45))
             }
+
+            context.stroke(
+                circle(radius: (size / 2) - (size * 0.005)),
+                with: .color(Color.white.opacity(0.024)),
+                lineWidth: scaled(max(1, size * 0.002))
+            )
+            context.stroke(
+                circle(radius: geometry.trackBandOuterRadius + (geometry.outerBufferWidth / 2)),
+                with: .color(Color(white: 0.055)),
+                lineWidth: scaled(max(1, geometry.outerBufferWidth))
+            )
+
+            for grooveIndex in 0..<96 {
+                let fraction = CGFloat(grooveIndex) / 95
+                let grooveRadius = geometry.trackBandRadiusBounds.upperBound - (trackBandWidth * fraction)
+                context.stroke(
+                    circle(radius: grooveRadius),
+                    with: .color(Color.white.opacity(grooveIndex.isMultiple(of: 8) ? 0.036 : 0.014)),
+                    lineWidth: scaled(grooveIndex.isMultiple(of: 8) ? 0.44 : 0.24)
+                )
+            }
+
+            for radius in trackDivisionRadii {
+                context.stroke(
+                    circle(radius: radius),
+                    with: .color(Color.white.opacity(0.026)),
+                    lineWidth: scaled(max(0.55, size * 0.00135))
+                )
+            }
+
+            context.stroke(
+                circle(radius: geometry.labelRadius + (geometry.innerBufferWidth / 2)),
+                with: .color(Color(white: 0.055)),
+                lineWidth: scaled(max(1, geometry.innerBufferWidth))
+            )
         }
+        .frame(width: size, height: size)
     }
 }
