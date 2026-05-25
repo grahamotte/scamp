@@ -24,7 +24,7 @@ fi
 echo "Generating app icons from: $SOURCE_IMAGE"
 
 generate() {
-  "$IM_CMD" "$SOURCE_IMAGE" -resize "${1}x${1}" "$ICONSET_DIR/$2"
+  "$IM_CMD" "$SOURCE_IMAGE" -resize "${1}x${1}" "PNG32:$ICONSET_DIR/$2"
   echo "  $2 ($1×$1)"
 }
 
