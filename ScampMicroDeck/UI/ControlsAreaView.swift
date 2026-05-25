@@ -9,20 +9,16 @@ struct ControlsAreaView: View {
     @ObservedObject var playback: PlaybackController
 
     var body: some View {
-        ZStack {
-            Color.clear
+        VStack(spacing: 0) {
+            Spacer()
 
-            VStack(spacing: 0) {
-                Spacer()
-
-                TransportControlsView(
-                    playback: playback,
-                    controlsTheme: controlsTheme,
-                    buttonSpacing: 10
-                )
-                    .frame(maxWidth: .infinity, alignment: .trailing)
-                    .padding(.trailing, edgeInset)
-            }
+            TransportControlsView(
+                playback: playback,
+                controlsTheme: controlsTheme,
+                buttonSpacing: 10
+            )
+            .frame(maxWidth: .infinity, alignment: .trailing)
+            .padding(.trailing, edgeInset)
         }
         .frame(width: width, height: height)
     }

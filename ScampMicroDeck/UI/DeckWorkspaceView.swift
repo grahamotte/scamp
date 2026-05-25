@@ -19,7 +19,7 @@ struct DeckWorkspaceView: View {
                 let windowSize = geometry.size
                 let chromeInset = geometry.safeAreaInsets.top
                 let squareSize = max(0, geometry.size.height - chromeInset)
-                let controlsWidth = max(0, geometry.size.width - chromeInset - squareSize)
+                let controlsWidth = max(0, geometry.size.width - squareSize)
                 let scrubProgress = scrubDragProgress ?? playback.playlistProgress
                 let lightSource = ThemeLighting.clampedSource(
                     debugLightSource ?? ThemeLighting.initialSource(in: windowSize),
@@ -50,14 +50,17 @@ struct DeckWorkspaceView: View {
                                     perform: {}
                                 )
 
-                                ControlsAreaView(
-                                    width: controlsWidth,
-                                    height: squareSize,
-                                    edgeInset: chromeInset,
-                                    controlsTheme: controlsTheme,
-                                    playback: playback
-                                )
+                                Spacer(minLength: 0)
                             }
+
+                            ControlsAreaView(
+                                width: controlsWidth,
+                                height: squareSize,
+                                edgeInset: chromeInset,
+                                controlsTheme: controlsTheme,
+                                playback: playback
+                            )
+                            .frame(width: geometry.size.width, height: squareSize, alignment: .topTrailing)
 
                             TonearmWorkspaceOverlay(
                                 deckWidth: geometry.size.width,
