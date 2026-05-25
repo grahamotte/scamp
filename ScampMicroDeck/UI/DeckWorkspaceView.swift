@@ -7,6 +7,7 @@ struct DeckWorkspaceView: View {
     @Binding var controlsTheme: ControlsTheme
     @State private var scrubDragProgress: Double?
     @State private var showsTonearmDebugGuides = false
+    @State private var debugLightSource: CGPoint?
     @State private var isRecordHoldGestureActive = false
 
     var body: some View {
@@ -15,71 +16,89 @@ struct DeckWorkspaceView: View {
                 .ignoresSafeArea()
 
             GeometryReader { geometry in
+                let windowSize = geometry.size
                 let chromeInset = geometry.safeAreaInsets.top
                 let squareSize = max(0, geometry.size.height - chromeInset)
                 let controlsWidth = max(0, geometry.size.width - chromeInset - squareSize)
                 let scrubProgress = scrubDragProgress ?? playback.playlistProgress
+                let lightSource = ThemeLighting.clampedSource(
+                    debugLightSource ?? ThemeLighting.initialSource(in: windowSize),
+                    in: windowSize
+                )
 
-                VStack(spacing: 0) {
-                    ZStack(alignment: .topLeading) {
-                        HStack(spacing: 0) {
-                            Color.clear
-                                .frame(width: chromeInset)
+                ZStack(alignment: .topLeading) {
+                    VStack(spacing: 0) {
+                        ZStack(alignment: .topLeading) {
+                            HStack(spacing: 0) {
+                                Color.clear
+                                    .frame(width: chromeInset)
 
-                            RecordAreaPlaceholderView(
-                                size: squareSize,
-                                playback: playback,
-                                theme: recordTheme
-                            )
-                            .equatable()
-                            .contentShape(Circle())
-                            .onLongPressGesture(
-                                minimumDuration: 0,
-                                maximumDistance: .greatestFiniteMagnitude,
-                                pressing: { isPressing in
-                                    guard isRecordHoldGestureActive != isPressing else { return }
-                                    isRecordHoldGestureActive = isPressing
-                                    playback.setRecordHoldActive(isPressing)
-                                },
-                                perform: {}
-                            )
+                                RecordAreaPlaceholderView(
+                                    size: squareSize,
+                                    playback: playback,
+                                    theme: recordTheme
+                                )
+                                .equatable()
+                                .contentShape(Circle())
+                                .onLongPressGesture(
+                                    minimumDuration: 0,
+                                    maximumDistance: .greatestFiniteMagnitude,
+                                    pressing: { isPressing in
+                                        guard isRecordHoldGestureActive != isPressing else { return }
+                                        isRecordHoldGestureActive = isPressing
+                                        playback.setRecordHoldActive(isPressing)
+                                    },
+                                    perform: {}
+                                )
 
-                            ControlsAreaView(
-                                width: controlsWidth,
-                                height: squareSize,
-                                edgeInset: chromeInset,
+                                ControlsAreaView(
+                                    width: controlsWidth,
+                                    height: squareSize,
+                                    edgeInset: chromeInset,
+                                    controlsTheme: controlsTheme,
+                                    playback: playback
+                                )
+                            }
+
+                            TonearmWorkspaceOverlay(
+                                deckWidth: geometry.size.width,
+                                deckHeight: squareSize,
+                                recordOriginX: chromeInset,
+                                recordDiameter: squareSize,
                                 controlsTheme: controlsTheme,
-                                playback: playback
+                                progress: scrubProgress,
+                                showsDebugGuides: showsTonearmDebugGuides,
+                                onCounterweightTapped: {
+                                    showsTonearmDebugGuides.toggle()
+                                },
+                                onScrubChanged: { progress in
+                                    scrubDragProgress = progress
+                                },
+                                onScrubEnded: { progress in
+                                    scrubDragProgress = nil
+                                    playback.seek(toPlaylistProgress: progress)
+                                }
                             )
                         }
+                        .frame(width: geometry.size.width, height: squareSize, alignment: .topLeading)
 
-                        TonearmWorkspaceOverlay(
-                            deckWidth: geometry.size.width,
-                            deckHeight: squareSize,
-                            recordOriginX: chromeInset,
-                            recordDiameter: squareSize,
-                            controlsTheme: controlsTheme,
-                            progress: scrubProgress,
-                            showsDebugGuides: showsTonearmDebugGuides,
-                            onCounterweightTapped: {
-                                showsTonearmDebugGuides.toggle()
-                            },
-                            onScrubChanged: { progress in
-                                scrubDragProgress = progress
-                            },
-                            onScrubEnded: { progress in
-                                scrubDragProgress = nil
-                                playback.seek(toPlaylistProgress: progress)
-                            }
-                        )
+                        Color.clear
+                            .frame(maxWidth: .infinity)
+                            .frame(height: chromeInset)
                     }
-                    .frame(width: geometry.size.width, height: squareSize, alignment: .topLeading)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
 
-                    Color.clear
-                        .frame(maxWidth: .infinity)
-                        .frame(height: chromeInset)
+                    if showsTonearmDebugGuides {
+                        ThemeLightSourceHandle(
+                            source: lightSourceBinding(in: windowSize),
+                            windowSize: windowSize
+                        )
+                        .zIndex(10)
+                    }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .coordinateSpace(name: ThemeLighting.coordinateSpaceName)
+                .environment(\.themeLighting, ThemeLighting(source: lightSource))
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -89,6 +108,20 @@ struct DeckWorkspaceView: View {
                 playback.setRecordHoldActive(false)
             }
         }
+    }
+
+    private func lightSourceBinding(in size: CGSize) -> Binding<CGPoint> {
+        Binding(
+            get: {
+                ThemeLighting.clampedSource(
+                    debugLightSource ?? ThemeLighting.initialSource(in: size),
+                    in: size
+                )
+            },
+            set: { newSource in
+                debugLightSource = ThemeLighting.clampedSource(newSource, in: size)
+            }
+        )
     }
 }
 
@@ -124,7 +157,8 @@ private struct TonearmWorkspaceOverlay: View {
             headHeight: tonearm.headHeight,
             counterweightWidth: tonearm.counterweightWidth,
             counterweightHeight: tonearm.counterweightHeight,
-            armShaftThickness: tonearm.armShaftThickness
+            armShaftThickness: tonearm.armShaftThickness,
+            armRotation: tonearm.armRotation
         )
         let tonearmScrubGesture = tonearmDragGesture(
             start: tonearm.scrubGuide.start,

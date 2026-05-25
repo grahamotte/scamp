@@ -13,6 +13,7 @@ struct TonearmThemeGeometry {
     let counterweightWidth: CGFloat
     let counterweightHeight: CGFloat
     let armShaftThickness: CGFloat
+    let armRotation: Angle
 }
 
 struct TonearmHeadThemePart {
