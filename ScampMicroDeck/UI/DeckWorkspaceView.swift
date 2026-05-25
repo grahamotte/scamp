@@ -38,7 +38,6 @@ struct DeckWorkspaceView: View {
                                     playback: playback,
                                     theme: recordTheme
                                 )
-                                .equatable()
                                 .contentShape(Circle())
                                 .onLongPressGesture(
                                     minimumDuration: 0,

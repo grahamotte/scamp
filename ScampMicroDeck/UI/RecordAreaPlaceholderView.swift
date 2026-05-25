@@ -47,7 +47,7 @@ struct RecordAreaPlaceholderView: View, Equatable {
             let centerPegDiameter = hasPlaylist ? max(5, size * 0.02) : max(5, size * 0.018)
 
             ZStack {
-                recordSurface(for: geometry)
+                recordSurface(for: geometry, rotationDegrees: rotationDegrees)
                     .frame(width: size, height: size)
                     .rotationEffect(.degrees(rotationDegrees))
                     .transaction { transaction in
@@ -61,16 +61,27 @@ struct RecordAreaPlaceholderView: View, Equatable {
     }
 
     @ViewBuilder
-    private func recordSurface(for geometry: VinylRecordGeometry) -> some View {
+    private func recordSurface(for geometry: VinylRecordGeometry, rotationDegrees: Double) -> some View {
         if hasPlaylist {
-            loadedRecordSurface(for: geometry)
+            loadedRecordSurface(for: geometry, rotationDegrees: rotationDegrees)
         } else {
-            emptyRecordSurface
+            emptyRecordSurface(rotationDegrees: rotationDegrees)
         }
     }
 
-    private func loadedRecordSurface(for geometry: VinylRecordGeometry) -> some View {
-        ZStack {
+    @ViewBuilder
+    private func loadedRecordSurface(for geometry: VinylRecordGeometry, rotationDegrees: Double) -> some View {
+        if theme == .black {
+            BlackRecordTheme.loadedSurface(
+                size: size,
+                geometry: geometry,
+                trackDivisionRadii: trackDivisionRadii(in: geometry),
+                albumArtImage: albumArtImage,
+                currentTrackDisplayName: currentTrackDisplayName,
+                rotationDegrees: rotationDegrees
+            )
+        } else {
+            ZStack {
             Circle()
                 .fill(palette.backgroundColor)
                 .overlay {
@@ -176,12 +187,16 @@ struct RecordAreaPlaceholderView: View, Equatable {
                             .padding(size * 0.04)
                     }
                 }
-
+            }
         }
     }
 
-    private var emptyRecordSurface: some View {
-        ZStack {
+    @ViewBuilder
+    private func emptyRecordSurface(rotationDegrees: Double) -> some View {
+        if theme == .black {
+            BlackRecordTheme.emptySurface(size: size, rotationDegrees: rotationDegrees)
+        } else {
+            ZStack {
             Circle()
                 .fill(unloadedBackdropColor)
                 .overlay {
@@ -198,15 +213,19 @@ struct RecordAreaPlaceholderView: View, Equatable {
                     Circle()
                         .stroke(unloadedBackdropTrackColor.opacity(0.34), lineWidth: max(1, size * 0.0023))
                 )
-
+            }
         }
     }
 
+    @ViewBuilder
     private func centerPeg(diameter: CGFloat) -> some View {
+        if theme == .black {
+            BlackRecordTheme.centerPeg(diameter: diameter, bufferColor: palette.bufferColor)
+        } else {
         let bufferRingWidth = max(0.32, diameter * 0.045)
         let bufferRingDiameter = diameter + bufferRingWidth
 
-        return ZStack {
+            ZStack {
             Circle()
                 .stroke(palette.bufferColor.opacity(0.94), lineWidth: bufferRingWidth)
                 .frame(width: bufferRingDiameter, height: bufferRingDiameter)
@@ -240,6 +259,7 @@ struct RecordAreaPlaceholderView: View, Equatable {
                         .offset(x: -diameter * 0.16, y: -diameter * 0.16)
                 )
                 .shadow(color: .black.opacity(0.22), radius: max(0.8, diameter * 0.14), x: 0, y: max(0.5, diameter * 0.08))
+            }
         }
     }
 
