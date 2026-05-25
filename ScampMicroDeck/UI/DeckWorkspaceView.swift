@@ -11,20 +11,20 @@ struct DeckWorkspaceView: View {
     @State private var isRecordHoldGestureActive = false
 
     var body: some View {
-        ZStack {
-            TableThemeBackground(theme: tableTheme)
-                .ignoresSafeArea()
+        GeometryReader { geometry in
+            let windowSize = geometry.size
+            let chromeInset = geometry.safeAreaInsets.top
+            let squareSize = max(0, geometry.size.height - chromeInset)
+            let controlsWidth = max(0, geometry.size.width - squareSize)
+            let scrubProgress = scrubDragProgress ?? playback.playlistProgress
+            let lightSource = ThemeLighting.clampedSource(
+                debugLightSource ?? ThemeLighting.initialSource(in: windowSize),
+                in: windowSize
+            )
 
-            GeometryReader { geometry in
-                let windowSize = geometry.size
-                let chromeInset = geometry.safeAreaInsets.top
-                let squareSize = max(0, geometry.size.height - chromeInset)
-                let controlsWidth = max(0, geometry.size.width - squareSize)
-                let scrubProgress = scrubDragProgress ?? playback.playlistProgress
-                let lightSource = ThemeLighting.clampedSource(
-                    debugLightSource ?? ThemeLighting.initialSource(in: windowSize),
-                    in: windowSize
-                )
+            ZStack {
+                TableThemeBackground(theme: tableTheme)
+                    .ignoresSafeArea()
 
                 ZStack(alignment: .topLeading) {
                     VStack(spacing: 0) {
@@ -99,9 +99,10 @@ struct DeckWorkspaceView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                .coordinateSpace(name: ThemeLighting.coordinateSpaceName)
-                .environment(\.themeLighting, ThemeLighting(source: lightSource))
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .coordinateSpace(name: ThemeLighting.coordinateSpaceName)
+            .environment(\.themeLighting, ThemeLighting(source: lightSource))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onDisappear {

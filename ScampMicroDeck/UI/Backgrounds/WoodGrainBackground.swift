@@ -23,24 +23,41 @@ struct WoodGrainBackground: View {
                 .blendMode(.softLight)
                 .opacity(0.85)
 
-            LinearGradient(
-                colors: [
-                    Color.white.opacity(0.15),
-                    Color.clear,
-                    Color.black.opacity(0.24)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .blendMode(.overlay)
+            ThemeLightReader { light in
+                ZStack {
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.06),
+                            Color.clear,
+                            Color.black.opacity(0.12)
+                        ],
+                        startPoint: light.start,
+                        endPoint: light.end
+                    )
+                    .blendMode(.softLight)
+
+                    RadialGradient(
+                        colors: [
+                            Color.white.opacity(0.07),
+                            Color.white.opacity(0.02),
+                            Color.clear,
+                            Color.clear
+                        ],
+                        center: light.radialCenter,
+                        startRadius: 60,
+                        endRadius: 320
+                    )
+                    .blendMode(.screen)
+                }
+            }
 
             RadialGradient(
                 colors: [
                     Color.clear,
-                    Color.black.opacity(0.28)
+                    Color.black.opacity(0.22)
                 ],
                 center: .center,
-                startRadius: 120,
+                startRadius: 180,
                 endRadius: 640
             )
                 .blendMode(.multiply)
