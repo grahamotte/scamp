@@ -1,3 +1,6 @@
+[env]
+_.file = '.env'
+
 [tasks.build]
 description = "Build Scamp Micro Deck and publish /Scamp Micro Deck.app"
 run = "SCAMP_OPEN_FINDER=1 ./scripts/build.sh"
@@ -11,7 +14,7 @@ description = "Open ScampMicroDeck.xcodeproj in Xcode"
 run = "bash -c 'if [[ -d ScampMicroDeck.xcodeproj ]]; then open ScampMicroDeck.xcodeproj; else echo \"Could not find ScampMicroDeck.xcodeproj\" >&2; exit 1; fi'"
 
 [tasks.publish]
-description = "Archive and upload Scamp Micro Deck to App Store Connect"
+description = "Archive, upload to App Store Connect, sign for Developer ID, notarize, and publish to Codeberg and GitHub Releases"
 run = "./scripts/publish.sh"
 
 [tasks.push]
@@ -28,3 +31,4 @@ push_to() {
 push_to origin "ssh://git@codeberg.org/grahamotte/scamp-micro-deck.git"
 push_to origin_backup "git@github.com:grahamotte/scamp-micro-deck.git"
 '''
+

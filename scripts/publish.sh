@@ -1,86 +1,241 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+cleanup() {
+  if [[ -n "${KEY_FILE:-}" && -f "$KEY_FILE" ]]; then
+    rm -f "$KEY_FILE"
+  fi
+}
+trap cleanup EXIT
+
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT_PATH="$ROOT_DIR/ScampMicroDeck.xcodeproj"
-EXPORT_OPTIONS_PLIST="$ROOT_DIR/scripts/ExportOptions-AppStoreConnect.plist"
+ASC_EXPORT_OPTIONS="$ROOT_DIR/scripts/ExportOptions-AppStoreConnect.plist"
+DID_EXPORT_OPTIONS="$ROOT_DIR/scripts/ExportOptions-DeveloperID.plist"
 ARCHIVE_PATH="$ROOT_DIR/dist/archives/ScampMicroDeck.xcarchive"
-EXPORT_DIR="$ROOT_DIR/dist/export/ScampMicroDeck"
-USE_ASC_API_KEY=0
+ASC_EXPORT_DIR="$ROOT_DIR/dist/export/AppStoreConnect"
+DID_EXPORT_DIR="$ROOT_DIR/dist/export/DeveloperID"
+ZIP_PATH="$ROOT_DIR/dist/ScampMicroDeck.zip"
+CODEBERG_OWNER="grahamotte"
+CODEBERG_REPO="scamp-micro-deck"
+GITHUB_OWNER="grahamotte"
+GITHUB_REPO="scamp-micro-deck"
 
 usage() {
   echo "Usage: $0"
   echo
-  echo "Optional App Store Connect API key environment:"
-  echo "  ASC_KEY_PATH=/path/to/AuthKey_XXXXXXXXXX.p8"
-  echo "  ASC_KEY_ID=XXXXXXXXXX"
-  echo "  ASC_ISSUER_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+  echo "Archives, uploads to App Store Connect, signs for Developer ID, notarizes,"
+  echo "and publishes to Codeberg and GitHub Releases."
+  echo
+  echo "Required environment variables:"
+  echo "  CODEBERG_TOKEN         Codeberg personal access token (repository scope)"
+  echo "  GITHUB_TOKEN           GitHub personal access token (repo scope)"
+  echo "  APPLE_KEY_ID           App Store Connect API key ID"
+  echo "  APPLE_KEY_P8_BASE64    Base64-encoded App Store Connect API key .p8 file"
+  echo "  APPLE_ISSUER_ID        App Store Connect API issuer ID"
 }
 
-configure_auth() {
-  local has_any_auth=0
-
-  if [[ -n "${ASC_KEY_PATH:-}" || -n "${ASC_KEY_ID:-}" || -n "${ASC_ISSUER_ID:-}" ]]; then
-    has_any_auth=1
-  fi
-
-  if [[ "$has_any_auth" -eq 0 ]]; then
-    return
-  fi
-
-  if [[ -z "${ASC_KEY_PATH:-}" || -z "${ASC_KEY_ID:-}" || -z "${ASC_ISSUER_ID:-}" ]]; then
-    usage
-    echo
-    echo "Set ASC_KEY_PATH, ASC_KEY_ID, and ASC_ISSUER_ID, or leave all three unset to use Xcode's signed-in account."
-    exit 1
-  fi
-
-  USE_ASC_API_KEY=1
-}
-
-xcodebuild_with_auth() {
-  if [[ "$USE_ASC_API_KEY" -eq 1 ]]; then
-    xcodebuild "$@" \
-      -authenticationKeyPath "$ASC_KEY_PATH" \
-      -authenticationKeyID "$ASC_KEY_ID" \
-      -authenticationKeyIssuerID "$ASC_ISSUER_ID"
-  else
-    xcodebuild "$@"
-  fi
-}
-
-if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
-  usage
-  exit 0
-elif [[ -n "${1:-}" ]]; then
-  usage
-  exit 1
-fi
-
+# --- Check prerequisites ---
 if ! xcodebuild -version >/dev/null 2>&1; then
   echo "xcodebuild is unavailable. Install Xcode and select it."
   exit 1
 fi
 
-configure_auth
-mkdir -p "$(dirname "$ARCHIVE_PATH")" "$EXPORT_DIR"
+missing=()
+[[ -z "${CODEBERG_TOKEN:-}" ]] && missing+=("CODEBERG_TOKEN")
+[[ -z "${GITHUB_TOKEN:-}" ]] && missing+=("GITHUB_TOKEN")
+[[ -z "${APPLE_KEY_ID:-}" ]] && missing+=("APPLE_KEY_ID")
+[[ -z "${APPLE_KEY_P8_BASE64:-}" ]] && missing+=("APPLE_KEY_P8_BASE64")
+[[ -z "${APPLE_ISSUER_ID:-}" ]] && missing+=("APPLE_ISSUER_ID")
 
-echo "Archiving Scamp Micro Deck..."
+if [[ ${#missing[@]} -gt 0 ]]; then
+  echo "Missing required environment variables:"
+  for var in "${missing[@]}"; do
+    echo "  $var"
+  done
+  echo
+  usage
+  exit 1
+fi
+
+# --- Decode API key to temp file ---
+KEY_FILE="$(mktemp /tmp/scamp-micro-deck-key.XXXXXX.p8)"
+echo "$APPLE_KEY_P8_BASE64" | base64 -d > "$KEY_FILE"
+chmod 600 "$KEY_FILE"
+
+# --- Read version ---
+VERSION=$(xcodebuild -project "$PROJECT_PATH" -showBuildSettings 2>/dev/null | grep " MARKETING_VERSION" | head -1 | awk '{print $3}')
+if [[ -z "$VERSION" ]]; then
+  echo "Could not read MARKETING_VERSION from project"
+  exit 1
+fi
+echo "Version: $VERSION"
+
+# --- Shared archive step ---
+mkdir -p "$(dirname "$ARCHIVE_PATH")" "$ASC_EXPORT_DIR" "$DID_EXPORT_DIR"
+
+echo "Archiving Scamp Micro Deck (Release)..."
 rm -rf "$ARCHIVE_PATH"
-xcodebuild_with_auth archive \
+xcodebuild archive \
   -project "$PROJECT_PATH" \
   -scheme ScampMicroDeck \
   -configuration Release \
   -destination "generic/platform=macOS" \
   -archivePath "$ARCHIVE_PATH" \
+  -authenticationKeyPath "$KEY_FILE" \
+  -authenticationKeyID "$APPLE_KEY_ID" \
+  -authenticationKeyIssuerID "$APPLE_ISSUER_ID" \
   -allowProvisioningUpdates
 
-echo "Uploading Scamp Micro Deck archive to App Store Connect..."
-rm -rf "$EXPORT_DIR"
-xcodebuild_with_auth -exportArchive \
+# --- Export and upload to App Store Connect ---
+echo
+echo "=== Exporting for App Store Connect ==="
+rm -rf "$ASC_EXPORT_DIR"
+xcodebuild -exportArchive \
   -archivePath "$ARCHIVE_PATH" \
-  -exportPath "$EXPORT_DIR" \
-  -exportOptionsPlist "$EXPORT_OPTIONS_PLIST" \
+  -exportPath "$ASC_EXPORT_DIR" \
+  -exportOptionsPlist "$ASC_EXPORT_OPTIONS" \
+  -authenticationKeyPath "$KEY_FILE" \
+  -authenticationKeyID "$APPLE_KEY_ID" \
+  -authenticationKeyIssuerID "$APPLE_ISSUER_ID" \
   -allowProvisioningUpdates
 
-echo "Uploaded Scamp Micro Deck archive: $ARCHIVE_PATH"
+echo "Uploaded to App Store Connect."
+
+# --- Export Developer ID signed app ---
+echo
+echo "=== Exporting Developer ID signed app ==="
+rm -rf "$DID_EXPORT_DIR"
+xcodebuild -exportArchive \
+  -archivePath "$ARCHIVE_PATH" \
+  -exportPath "$DID_EXPORT_DIR" \
+  -exportOptionsPlist "$DID_EXPORT_OPTIONS" \
+  -allowProvisioningUpdates
+
+APP_PATH="$DID_EXPORT_DIR/Scamp Micro Deck.app"
+if [[ ! -d "$APP_PATH" ]]; then
+  echo "Export succeeded but app not found at: $APP_PATH"
+  exit 1
+fi
+
+# --- Create ZIP for notarization ---
+echo
+echo "Creating ZIP for notarization..."
+rm -f "$ZIP_PATH"
+ditto -c -k --keepParent "$APP_PATH" "$ZIP_PATH"
+echo "Created: $ZIP_PATH"
+
+# --- Notarize ---
+echo
+echo "Submitting for notarization..."
+xcrun notarytool submit "$ZIP_PATH" \
+  --key "$KEY_FILE" \
+  --key-id "$APPLE_KEY_ID" \
+  --issuer "$APPLE_ISSUER_ID" \
+  --wait
+
+echo "Stapling notarization ticket..."
+xcrun stapler staple "$APP_PATH"
+echo "Notarization complete."
+
+# --- Push git tag ---
+TAG="v$VERSION"
+echo
+echo "Creating and pushing tag $TAG..."
+if git rev-parse "$TAG" >/dev/null 2>&1; then
+  echo "Tag $TAG already exists — deleting and recreating"
+  git tag -d "$TAG"
+  git push origin ":refs/tags/$TAG" 2>/dev/null || true
+  git push origin_backup ":refs/tags/$TAG" 2>/dev/null || true
+fi
+git tag "$TAG"
+git push origin "$TAG"
+git push origin_backup "$TAG"
+
+# --- Create Codeberg release ---
+echo
+echo "=== Creating Codeberg release $TAG ==="
+sleep 2
+
+RELEASE_RESPONSE=$(curl -sS -X POST \
+  "https://codeberg.org/api/v1/repos/$CODEBERG_OWNER/$CODEBERG_REPO/releases" \
+  -H "Authorization: token $CODEBERG_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"tag_name\": \"$TAG\",
+    \"name\": \"$TAG\",
+    \"body\": \"Scamp Micro Deck $VERSION\",
+    \"draft\": false,
+    \"prerelease\": false
+  }" || true)
+
+RELEASE_ID=$(echo "$RELEASE_RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])" 2>/dev/null)
+if [[ -z "$RELEASE_ID" ]]; then
+  echo "Failed to create release. Response:"
+  echo "$RELEASE_RESPONSE"
+  exit 1
+fi
+echo "Release $TAG created, ID: $RELEASE_ID"
+
+echo "Uploading ScampMicroDeck.zip to release $RELEASE_ID..."
+ASSET_RESPONSE=$(curl -sS -X POST \
+  "https://codeberg.org/api/v1/repos/$CODEBERG_OWNER/$CODEBERG_REPO/releases/$RELEASE_ID/assets" \
+  -H "Authorization: token $CODEBERG_TOKEN" \
+  -H "Content-Type: multipart/form-data" \
+  -F "attachment=@$ZIP_PATH" || true)
+
+ASSET_NAME=$(echo "$ASSET_RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin).get('name',''))" 2>/dev/null)
+if [[ -z "$ASSET_NAME" ]]; then
+  echo "Failed to upload asset. Response:"
+  echo "$ASSET_RESPONSE"
+  exit 1
+fi
+echo "Uploaded: $ASSET_NAME"
+
+# --- Create GitHub release ---
+echo
+echo "=== Creating GitHub release $TAG ==="
+
+GITHUB_RELEASE_RESPONSE=$(curl -sS -X POST \
+  "https://api.github.com/repos/$GITHUB_OWNER/$GITHUB_REPO/releases" \
+  -H "Authorization: Bearer $GITHUB_TOKEN" \
+  -H "Accept: application/vnd.github+json" \
+  -H "X-GitHub-Api-Version: 2022-11-28" \
+  -d "{
+    \"tag_name\": \"$TAG\",
+    \"name\": \"$TAG\",
+    \"body\": \"Scamp Micro Deck $VERSION\",
+    \"draft\": false,
+    \"prerelease\": false
+  }" || true)
+
+GITHUB_RELEASE_ID=$(echo "$GITHUB_RELEASE_RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])" 2>/dev/null)
+if [[ -z "$GITHUB_RELEASE_ID" ]]; then
+  echo "Failed to create GitHub release. Response:"
+  echo "$GITHUB_RELEASE_RESPONSE"
+  exit 1
+fi
+echo "GitHub release $TAG created, ID: $GITHUB_RELEASE_ID"
+
+echo "Uploading ScampMicroDeck.zip to GitHub release $GITHUB_RELEASE_ID..."
+GITHUB_ASSET_RESPONSE=$(curl -sS -X POST \
+  "https://uploads.github.com/repos/$GITHUB_OWNER/$GITHUB_REPO/releases/$GITHUB_RELEASE_ID/assets?name=ScampMicroDeck.zip" \
+  -H "Authorization: Bearer $GITHUB_TOKEN" \
+  -H "Accept: application/vnd.github+json" \
+  -H "Content-Type: application/zip" \
+  --data-binary "@$ZIP_PATH" || true)
+
+GITHUB_ASSET_NAME=$(echo "$GITHUB_ASSET_RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin).get('name',''))" 2>/dev/null)
+if [[ -z "$GITHUB_ASSET_NAME" ]]; then
+  echo "Failed to upload GitHub asset. Response:"
+  echo "$GITHUB_ASSET_RESPONSE"
+  exit 1
+fi
+echo "Uploaded to GitHub: $GITHUB_ASSET_NAME"
+
+# --- Summary ---
+echo
+echo "=== Published v$VERSION ==="
+echo "App Store Connect: uploaded"
+echo "Codeberg release: https://codeberg.org/$CODEBERG_OWNER/$CODEBERG_REPO/releases/tag/$TAG"
+echo "GitHub release: https://github.com/$GITHUB_OWNER/$GITHUB_REPO/releases/tag/$TAG"

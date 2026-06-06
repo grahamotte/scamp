@@ -1,11 +1,21 @@
 ---
 name: "publish"
-description: "Publish Scamp Micro Deck by requiring a clean worktree, running the version bump skill, running mise push, then running mise publish. Use when the user asks to publish, release, upload, or ship Scamp Micro Deck to App Store Connect."
+description: "Publish Scamp Micro Deck by requiring a clean worktree, running the version bump skill, running mise push, then running mise publish. Use when the user asks to publish, release, upload, or ship Scamp Micro Deck."
 ---
 
 # Publish
 
 Use this skill when the user wants to publish Scamp Micro Deck.
+
+`mise publish` archives, uploads to App Store Connect, signs for Developer ID,
+notarizes, and publishes the notarized zip to Codeberg and GitHub Releases.
+
+Requires these environment variables in `.env`:
+- `CODEBERG_TOKEN` — Codeberg personal access token
+- `GITHUB_TOKEN` — GitHub personal access token
+- `APPLE_KEY_ID` — App Store Connect API key ID
+- `APPLE_KEY_P8_BASE64` — Base64-encoded .p8 private key
+- `APPLE_ISSUER_ID` — App Store Connect API issuer ID
 
 ## Workflow
 
@@ -26,7 +36,8 @@ Use this skill when the user wants to publish Scamp Micro Deck.
    - Old version and new version.
    - The version bump reasoning.
    - The commits that got pushed, including the `Version` commit.
-   - Whether the macOS archive was uploaded.
+   - Whether the App Store Connect upload succeeded.
+   - Whether the GitHub and Codeberg releases were created.
 
 ## Guidance
 
