@@ -24,6 +24,10 @@ Tools:
 - `mise start` - stop, rebuild, and launch the app
 - `mise xcode` - open the project in Xcode
 
+`mise publish` also requires `CODEBERG_TOKEN`, `GITHUB_TOKEN`,
+`APPLE_KEY_ID`, `APPLE_KEY_P8_BASE64`, and the team-key
+`APPLE_ISSUER_ID` in the ignored `.env` file.
+
 ## License
 
 MIT

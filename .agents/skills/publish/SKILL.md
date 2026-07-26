@@ -7,8 +7,9 @@ description: "Publish Scamp Micro Deck by requiring a clean worktree, running th
 
 Use this skill when the user wants to publish Scamp Micro Deck.
 
-`mise publish` archives, uploads to App Store Connect, signs for Developer ID,
-notarizes, and publishes the notarized zip to Codeberg and GitHub Releases.
+`mise publish` archives, uploads and submits the macOS version to App Review,
+signs for Developer ID, notarizes, and publishes the notarized zip to Codeberg
+and GitHub Releases.
 
 Requires these environment variables in `.env`:
 - `CODEBERG_TOKEN` — Codeberg personal access token
@@ -31,12 +32,14 @@ Requires these environment variables in `.env`:
    - If `mise push` fails, report the failure and do not publish.
 5. After `mise push` succeeds, run `mise publish`.
    - Do not manually reimplement the publish script.
+   - It preserves the existing App Store release timing and submits the uploaded
+     macOS build with `Bug fixes.` in every localization.
    - If `mise publish` fails, report the failure and where it stopped.
 6. When done, summarize:
    - Old version and new version.
    - The version bump reasoning.
    - The commits that got pushed, including the `Version` commit.
-   - Whether the App Store Connect upload succeeded.
+   - Whether the App Store Connect upload and App Review submission succeeded.
    - Whether the GitHub and Codeberg releases were created.
 
 ## Guidance

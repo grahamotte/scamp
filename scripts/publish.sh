@@ -20,6 +20,8 @@ CODEBERG_OWNER="grahamotte"
 CODEBERG_REPO="scamp-micro-deck"
 GITHUB_OWNER="grahamotte"
 GITHUB_REPO="scamp-micro-deck"
+ASC_PLATFORM="MAC_OS"
+ASC_BUNDLE_ID="com.grahamotte.scamp"
 
 usage() {
   echo "Usage: $0"
@@ -69,7 +71,16 @@ if [[ -z "$VERSION" ]]; then
   echo "Could not read MARKETING_VERSION from project"
   exit 1
 fi
+VERSIONS=$(awk '/MARKETING_VERSION =/ { gsub(/;/, "", $3); print $3 }' \
+  "$PROJECT_PATH/project.pbxproj" | sort -u)
+if [[ "$(printf "%s\n" "$VERSIONS" | awk 'NF { count++ } END { print count + 0 }')" -ne 1 ]]; then
+  echo "All publish targets must use one MARKETING_VERSION; found: $VERSIONS"
+  exit 1
+fi
 echo "Version: $VERSION"
+
+# --- Read-only App Store Connect preflight ---
+"$ROOT_DIR/scripts/app-store-submit.rb" --validate "$ASC_PLATFORM" "$ASC_BUNDLE_ID" "$VERSION"
 
 # --- Shared archive step ---
 mkdir -p "$(dirname "$ARCHIVE_PATH")" "$ASC_EXPORT_DIR" "$DID_EXPORT_DIR"
@@ -87,6 +98,13 @@ xcodebuild archive \
   -authenticationKeyIssuerID "$APPLE_ISSUER_ID" \
   -allowProvisioningUpdates
 
+UNREADABLE=$(find "$ARCHIVE_PATH/Products/Applications" \
+  \( -type f ! -perm -004 -o -type d ! -perm -005 \) -print -quit)
+if [[ -n "$UNREADABLE" ]]; then
+  echo "Archive contains an unreadable distribution item: $UNREADABLE"
+  exit 1
+fi
+
 # --- Export and upload to App Store Connect ---
 echo
 echo "=== Exporting for App Store Connect ==="
@@ -101,6 +119,21 @@ xcodebuild -exportArchive \
   -allowProvisioningUpdates
 
 echo "Uploaded to App Store Connect."
+
+INFO_PLIST="$ARCHIVE_PATH/Products/Applications/Scamp Micro Deck.app/Contents/Info.plist"
+if [[ ! -f "$INFO_PLIST" ]]; then
+  echo "Could not find archived app Info.plist: $INFO_PLIST"
+  exit 1
+fi
+ARCHIVE_BUNDLE_ID=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$INFO_PLIST")
+ARCHIVE_VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$INFO_PLIST")
+ARCHIVE_BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$INFO_PLIST")
+if [[ "$ARCHIVE_BUNDLE_ID" != "$ASC_BUNDLE_ID" || "$ARCHIVE_VERSION" != "$VERSION" ]]; then
+  echo "Archive identity mismatch: $ARCHIVE_BUNDLE_ID $ARCHIVE_VERSION, expected $ASC_BUNDLE_ID $VERSION"
+  exit 1
+fi
+"$ROOT_DIR/scripts/app-store-submit.rb" \
+  "$ASC_PLATFORM" "$ARCHIVE_BUNDLE_ID" "$ARCHIVE_VERSION" "$ARCHIVE_BUILD"
 
 # --- Export Developer ID signed app ---
 echo
