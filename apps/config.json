@@ -1,86 +1,53 @@
 {
-  "build": "0.2.0",
-  "contactEmail": "go@graham.lol",
+  "build": "1.4.3",
+  "contactEmail": "graham.otte@gmail.com",
   "contactFirstName": "Graham",
   "contactLastName": "Otte",
-  "contactPhone": "+1 202 555 0100",
-  "copyright": "2026 Graham Otte",
+  "contactPhone": "7142279963",
+  "copyright": "Graham Otte",
   "demoAccountName": "",
   "demoAccountPassword": "",
   "demoAccountRequired": false,
-  "description": "Code Moto helps developers build momentum with focused coding sessions. Name what you're working on, choose a session length, and track completed sessions entirely on your device.",
-  "keywords": "focus,timer,coding,developer,productivity,session,momentum,work",
-  "marketingUrl": "https://codemoto.org",
-  "name": "Code Moto",
-  "notes": "Code Moto does not require an account or sign-in. All session data is stored locally on the device.",
+  "description": "Scamp is a native macOS music player meant to emulate all the tedious, crappy charm of a real vinyl record player.",
+  "keywords": "music, vinyl, record, mp3, flac, audio",
+  "marketingUrl": "https://github.com/grahamotte/scamp",
+  "name": "Scamp Micro Deck",
+  "notes": "Scamp is a local macOS music player. To use the app, you must load a folder that contains playable audio files such as MP3s. Scamp does not open individual song files one at a time.\n\nNo login, account, subscription, or external device is required.\n\nThe easiest way to review the app is to open it and choose Help > Load Demo Album. That will load a bundled sample album right away.\n\nYou can also test normal playback by either clicking the eject button and choosing a folder with audio files, or by dragging a folder into the app window.\n\nOn first launch, Scamp automatically shows a short help guide. That guide is also available later from Help > Scamp Micro Deck Help. You will need to dismiss the guide before you can play music through Scamp.\n\nThe attached \"demo album.zip\" will need to be unzipped before Scamp is able to play it. \n\nAlbum art used in screenshots: https://www.loc.gov/resource/ppmsca.51533/",
   "primaryLocale": "en-US",
-  "promotionalText": "Build momentum with focused coding sessions and keep a private record of completed work.",
+  "promotionalText": "Rediscover your music library with the tedious, crappy charm of a real vinyl record player.",
   "releaseType": "AFTER_APPROVAL",
-  "supportUrl": "https://codemoto.org",
+  "supportUrl": "https://github.com/grahamotte/scamp",
   "targets": {
     "apple": {
-      "ios": {
-        "archiveDestination": "generic/platform=iOS",
-        "bundleIdentifier": "com.grahamotte.codemoto",
-        "platform": "IOS",
-        "project": "apps/apple/App.xcodeproj",
-        "scheme": "App",
-        "screenshots": [
-          {
-            "displayType": "APP_IPHONE_65",
-            "path": "apps/screenshots/ios-iphone-1.jpeg"
-          },
-          {
-            "displayType": "APP_IPAD_PRO_3GEN_129",
-            "path": "apps/screenshots/ios-ipad-1.jpeg"
-          }
-        ],
-        "simulatorDestination": "generic/platform=iOS Simulator",
-        "simulatorProduct": "Debug-iphonesimulator/App.app",
-        "simulators": {
-          "ipad": "iPad",
-          "iphone": "iPhone"
-        }
-      },
       "macos": {
         "archiveDestination": "generic/platform=macOS",
-        "bundleIdentifier": "com.grahamotte.codemoto",
+        "bundleIdentifier": "com.grahamotte.scamp",
         "platform": "MAC_OS",
         "project": "apps/apple/App.xcodeproj",
         "scheme": "App-macOS",
         "screenshots": [
           {
             "displayType": "APP_DESKTOP",
-            "path": "apps/screenshots/macos-1.jpeg"
+            "path": "apps/screenshots/macos-1.png"
+          },
+          {
+            "displayType": "APP_DESKTOP",
+            "path": "apps/screenshots/macos-2.png"
+          },
+          {
+            "displayType": "APP_DESKTOP",
+            "path": "apps/screenshots/macos-3.png"
           }
         ],
         "simulatorDestination": "platform=macOS",
-        "simulatorProduct": "Debug/App-macOS.app",
+        "simulatorProduct": "Debug/Scamp Micro Deck.app",
         "simulators": {
           "macos": "Mac"
-        }
-      },
-      "tvos": {
-        "archiveDestination": "generic/platform=tvOS",
-        "bundleIdentifier": "com.grahamotte.codemoto",
-        "platform": "TV_OS",
-        "project": "apps/apple/App.xcodeproj",
-        "scheme": "App-tvOS",
-        "screenshots": [
-          {
-            "displayType": "APP_APPLE_TV",
-            "path": "apps/screenshots/tvos-1.jpeg"
-          }
-        ],
-        "simulatorDestination": "generic/platform=tvOS Simulator",
-        "simulatorProduct": "Debug-appletvsimulator/App-tvOS.app",
-        "simulators": {
-          "tv": "Apple TV"
         }
       }
     },
     "android": {}
   },
-  "version": "0.2.0",
-  "whatsNew": "Added repository-only macOS publishing and improved release reliability."
+  "version": "1.4.3",
+  "whatsNew": "Bug fixes."
 }
