@@ -10,6 +10,7 @@ enum TableTheme: String, CaseIterable, Identifiable {
     case wood
     case frostedGlass
     case rainbow
+    case marble
 
     var id: String { rawValue }
 
@@ -21,6 +22,8 @@ enum TableTheme: String, CaseIterable, Identifiable {
             return FrostedGlassTableTheme.self
         case .rainbow:
             return RainbowTableTheme.self
+        case .marble:
+            return MarbleTableTheme.self
         }
     }
 
