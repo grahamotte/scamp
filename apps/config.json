@@ -1,5 +1,5 @@
 {
-  "build": "1.5.0",
+  "build": "1.5.1",
   "contactEmail": "graham.otte@gmail.com",
   "contactFirstName": "Graham",
   "contactLastName": "Otte",
@@ -48,6 +48,6 @@
     },
     "android": {}
   },
-  "version": "1.5.0",
+  "version": "1.5.1",
   "whatsNew": "Bug fixes."
 }
