@@ -1,5 +1,5 @@
 {
-  "build": "1.6.0",
+  "build": "1.6.1",
   "contactEmail": "graham.otte@gmail.com",
   "contactFirstName": "Graham",
   "contactLastName": "Otte",
@@ -48,6 +48,6 @@
     },
     "android": {}
   },
-  "version": "1.6.0",
+  "version": "1.6.1",
   "whatsNew": "Browse your music collection on a persistent album shelf, sort albums by artist, title, or most played, and switch records with a click."
 }
