@@ -492,6 +492,7 @@ private struct AlbumShelfCard: View, Equatable {
     let size: CGFloat
     let onSelect: () -> Void
     private let artworkImage: NSImage?
+    private let wearPattern: AlbumWearPattern
     @State private var isHovered = false
 
     init(
@@ -503,6 +504,7 @@ private struct AlbumShelfCard: View, Equatable {
         self.size = size
         self.onSelect = onSelect
         artworkImage = album.artworkURL.flatMap { NSImage(contentsOf: $0) }
+        wearPattern = AlbumWearPattern(album: album)
     }
 
     static func == (left: AlbumShelfCard, right: AlbumShelfCard) -> Bool {
@@ -541,7 +543,15 @@ private struct AlbumShelfCard: View, Equatable {
 
             }
             .frame(width: size, height: size)
-            .clipShape(RoundedRectangle(cornerRadius: 2, style: .continuous))
+            .overlay {
+                AlbumCoverWear(pattern: wearPattern)
+            }
+            .clipShape(AlbumCoverShape(pattern: wearPattern))
+            .shadow(
+                color: .black.opacity(isHovered ? 0.28 : 0),
+                radius: isHovered ? 6 : 0,
+                y: isHovered ? 5 : 0
+            )
             .rotation3DEffect(
                 .degrees(isHovered ? 0 : 4),
                 axis: (x: 1, y: 0, z: 0),
@@ -591,6 +601,170 @@ private struct AlbumShelfCard: View, Equatable {
                     .foregroundStyle(.white.opacity(0.9))
             }
         }
+    }
+}
+
+private struct AlbumWearPattern {
+    let seed: UInt64
+
+    init(album: LibraryAlbum) {
+        var hash: UInt64 = 1_469_598_103_934_665_603
+        for byte in "\(album.artist)\u{0}\(album.title)".utf8 {
+            hash ^= UInt64(byte)
+            hash &*= 1_099_511_628_211
+        }
+        seed = hash
+    }
+
+    func value(_ index: Int, in range: ClosedRange<CGFloat>) -> CGFloat {
+        let unitValue = unit(index)
+        return range.lowerBound + (range.upperBound - range.lowerBound) * unitValue
+    }
+
+    func unit(_ index: Int) -> CGFloat {
+        var value = seed &+ 0x9E3779B97F4A7C15 &* UInt64(index + 1)
+        value = (value ^ (value >> 30)) &* 0xBF58476D1CE4E5B9
+        value = (value ^ (value >> 27)) &* 0x94D049BB133111EB
+        value ^= value >> 31
+        return CGFloat(value & 0xFFFF) / CGFloat(UInt16.max)
+    }
+}
+
+private struct AlbumCoverShape: Shape {
+    let pattern: AlbumWearPattern
+
+    func path(in rect: CGRect) -> Path {
+        let topLeftCorner = pattern.value(0, in: 4...4.6)
+        let topRightCorner = pattern.value(1, in: 4...4.6)
+        let bottomRightCorner = pattern.value(2, in: 4...4.6)
+        let bottomLeftCorner = pattern.value(3, in: 4...4.6)
+        let topDrift = pattern.value(4, in: 0.55...1)
+        let rightDrift = pattern.value(5, in: 0.5...1)
+        let bottomDrift = pattern.value(6, in: 0.5...0.95)
+        let leftDrift = pattern.value(7, in: 0.5...0.95)
+        let topNick = rect.minX + rect.width * pattern.value(8, in: 0.18...0.62)
+        let sideNick = rect.minY + rect.height * pattern.value(9, in: 0.22...0.64)
+        let topNickDepth = pattern.value(10, in: 0.8...1.35)
+        let sideNickDepth = pattern.value(11, in: 0.75...1.3)
+        var path = Path()
+
+        path.move(to: CGPoint(x: rect.minX + topLeftCorner, y: rect.minY + 0.55))
+        path.addLine(to: CGPoint(x: topNick - 1.4, y: rect.minY + topDrift))
+        path.addLine(to: CGPoint(x: topNick, y: rect.minY + topDrift + topNickDepth))
+        path.addLine(to: CGPoint(x: topNick + 2.1, y: rect.minY + topDrift * 0.65))
+        path.addLine(to: CGPoint(x: rect.maxX - topRightCorner, y: rect.minY + 0.4))
+        path.addQuadCurve(
+            to: CGPoint(x: rect.maxX - 0.45, y: rect.minY + topRightCorner),
+            control: CGPoint(x: rect.maxX - 0.8, y: rect.minY + 1)
+        )
+        path.addLine(to: CGPoint(x: rect.maxX - rightDrift, y: sideNick - 1.6))
+        path.addLine(to: CGPoint(x: rect.maxX - rightDrift - sideNickDepth, y: sideNick))
+        path.addLine(to: CGPoint(x: rect.maxX - rightDrift * 0.55, y: sideNick + 2.2))
+        path.addLine(to: CGPoint(x: rect.maxX - 0.4, y: rect.maxY - bottomRightCorner))
+        path.addQuadCurve(
+            to: CGPoint(x: rect.maxX - bottomRightCorner, y: rect.maxY - 0.45),
+            control: CGPoint(x: rect.maxX - 1, y: rect.maxY - 0.8)
+        )
+        path.addLine(to: CGPoint(x: rect.minX + rect.width * 0.66, y: rect.maxY - bottomDrift))
+        path.addLine(to: CGPoint(x: rect.minX + bottomLeftCorner, y: rect.maxY - 0.4))
+        path.addQuadCurve(
+            to: CGPoint(x: rect.minX + 0.45, y: rect.maxY - bottomLeftCorner),
+            control: CGPoint(x: rect.minX + 0.85, y: rect.maxY - 0.9)
+        )
+        path.addLine(to: CGPoint(x: rect.minX + leftDrift, y: rect.minY + rect.height * 0.65))
+        path.addLine(to: CGPoint(x: rect.minX + 0.4, y: rect.minY + topLeftCorner))
+        path.addQuadCurve(
+            to: CGPoint(x: rect.minX + topLeftCorner, y: rect.minY + 0.55),
+            control: CGPoint(x: rect.minX + 0.9, y: rect.minY + 1)
+        )
+        path.closeSubpath()
+
+        return path
+    }
+}
+
+private struct AlbumCoverWear: View {
+    let pattern: AlbumWearPattern
+
+    var body: some View {
+        Canvas { context, size in
+            let rect = CGRect(origin: .zero, size: size)
+            let edgeShape = AlbumCoverShape(pattern: pattern)
+            context.stroke(
+                edgeShape.path(in: rect.insetBy(dx: 0.7, dy: 0.7)),
+                with: .color(.black.opacity(0.24)),
+                lineWidth: 1
+            )
+
+            let paper = Color(red: 0.92, green: 0.82, blue: 0.64)
+
+            for index in 0..<7 {
+                let edge = min(Int(pattern.unit(20 + index) * 4), 3)
+                let position = pattern.value(30 + index, in: 0.1...0.9)
+                let length = pattern.value(40 + index, in: 2.5...7)
+                let inset = pattern.value(50 + index, in: 1...2.1)
+                var scuff = Path()
+
+                switch edge {
+                case 0:
+                    let x = size.width * position
+                    scuff.move(to: CGPoint(x: x - length * 0.5, y: inset))
+                    scuff.addLine(to: CGPoint(x: x + length * 0.5, y: inset + pattern.value(60 + index, in: -0.45...0.45)))
+                case 1:
+                    let y = size.height * position
+                    scuff.move(to: CGPoint(x: size.width - inset, y: y - length * 0.5))
+                    scuff.addLine(to: CGPoint(x: size.width - inset + pattern.value(60 + index, in: -0.45...0.45), y: y + length * 0.5))
+                case 2:
+                    let x = size.width * position
+                    scuff.move(to: CGPoint(x: x - length * 0.5, y: size.height - inset))
+                    scuff.addLine(to: CGPoint(x: x + length * 0.5, y: size.height - inset + pattern.value(60 + index, in: -0.45...0.45)))
+                default:
+                    let y = size.height * position
+                    scuff.move(to: CGPoint(x: inset, y: y - length * 0.5))
+                    scuff.addLine(to: CGPoint(x: inset + pattern.value(60 + index, in: -0.45...0.45), y: y + length * 0.5))
+                }
+
+                context.stroke(
+                    scuff,
+                    with: .color(paper.opacity(pattern.value(70 + index, in: 0.38...0.68))),
+                    style: StrokeStyle(
+                        lineWidth: pattern.value(80 + index, in: 0.75...1.2),
+                        lineCap: .round
+                    )
+                )
+            }
+
+            for corner in 0..<4 where pattern.unit(90 + corner) > 0.42 {
+                let depth = pattern.value(100 + corner, in: 3.3...5.2)
+                var exposedCorner = Path()
+
+                switch corner {
+                case 0:
+                    exposedCorner.move(to: CGPoint(x: 1, y: depth))
+                    exposedCorner.addLine(to: CGPoint(x: depth, y: 1))
+                    exposedCorner.addLine(to: CGPoint(x: depth * 0.62, y: depth))
+                case 1:
+                    exposedCorner.move(to: CGPoint(x: size.width - 1, y: depth))
+                    exposedCorner.addLine(to: CGPoint(x: size.width - depth, y: 1))
+                    exposedCorner.addLine(to: CGPoint(x: size.width - depth * 0.62, y: depth))
+                case 2:
+                    exposedCorner.move(to: CGPoint(x: size.width - 1, y: size.height - depth))
+                    exposedCorner.addLine(to: CGPoint(x: size.width - depth, y: size.height - 1))
+                    exposedCorner.addLine(to: CGPoint(x: size.width - depth * 0.62, y: size.height - depth))
+                default:
+                    exposedCorner.move(to: CGPoint(x: 1, y: size.height - depth))
+                    exposedCorner.addLine(to: CGPoint(x: depth, y: size.height - 1))
+                    exposedCorner.addLine(to: CGPoint(x: depth * 0.62, y: size.height - depth))
+                }
+
+                exposedCorner.closeSubpath()
+                context.fill(
+                    exposedCorner,
+                    with: .color(paper.opacity(pattern.value(110 + corner, in: 0.2...0.38)))
+                )
+            }
+        }
+        .allowsHitTesting(false)
     }
 }
 
