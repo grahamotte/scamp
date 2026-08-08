@@ -4,7 +4,7 @@ Scamp Micro Deck is a native macOS music player for local folders of audio files
 
 <!-- markdownlint-disable MD033 -->
 <p align="center">
-  <img src="assets/screenshot.png" alt="Scamp Micro Deck screenshot">
+  <img src="assets/screenshot-2.png" alt="Scamp Micro Deck screenshot">
 </p>
 
 <p align="center">
