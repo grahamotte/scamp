@@ -18,6 +18,7 @@ final class PlaybackController: ObservableObject {
     @Published private(set) var turntableSpeed: Double = 0
     @Published private(set) var albumArtImage: NSImage?
     @Published private(set) var playlistProgress: Double = 0
+    @Published private(set) var currentAlbumFolderURL: URL?
 
     private static let spinUpDuration: TimeInterval = 1.6
     private static let spinDownDuration: TimeInterval = 2.0
@@ -55,6 +56,7 @@ final class PlaybackController: ObservableObject {
     private var spinRampTask: Task<Void, Never>?
     private var recordHoldRampTask: Task<Void, Never>?
     private var progressTask: Task<Void, Never>?
+    private var playlistLoadTask: Task<Void, Never>?
     private var progressTickCount = 0
     private var pendingSpinDownAction: SpinDownAction = .none
     private var baseTurntableSpeed: Double = 0
@@ -84,6 +86,7 @@ final class PlaybackController: ObservableObject {
         spinRampTask?.cancel()
         recordHoldRampTask?.cancel()
         progressTask?.cancel()
+        playlistLoadTask?.cancel()
 
         if let folderURL = securityScopedFolderURL {
             folderURL.stopAccessingSecurityScopedResource()
@@ -244,17 +247,19 @@ final class PlaybackController: ObservableObject {
         )
     }
 
-    func loadFolder() {
-        guard let folderURL = chooseFolderURL() else {
-            return
+    func loadFolder(from folderURL: URL) {
+        playlistLoadTask?.cancel()
+        playlistLoadTask = Task { @MainActor [weak self] in
+            await self?.loadPlaylist(from: folderURL)
         }
-
-        loadFolder(from: folderURL)
     }
 
-    func loadFolder(from folderURL: URL) {
-        Task { @MainActor [weak self] in
-            await self?.loadPlaylist(from: folderURL)
+    func loadAlbum(from folderURL: URL) {
+        let startsPlaying = isPlaying
+        playlistLoadTask?.cancel()
+        currentAlbumFolderURL = folderURL
+        playlistLoadTask = Task { @MainActor [weak self] in
+            await self?.loadPlaylist(from: folderURL, startsPlaying: startsPlaying)
         }
     }
 
@@ -271,16 +276,6 @@ final class PlaybackController: ObservableObject {
         }
 
         return !tracks.isEmpty
-    }
-
-    func ejectAndLoadFolder() {
-        ejectCurrentRecord()
-
-        guard let folderURL = chooseFolderURL() else {
-            return
-        }
-
-        loadFolder(from: folderURL)
     }
 
     func loadDemoAlbum() {
@@ -317,41 +312,13 @@ final class PlaybackController: ObservableObject {
                 }
             }
 
-            Task { @MainActor [weak self] in
+            playlistLoadTask?.cancel()
+            playlistLoadTask = Task { @MainActor [weak self] in
                 await self?.loadPlaylist(from: demoAlbumURL)
             }
         } catch {
             return
         }
-    }
-
-    private func chooseFolderURL() -> URL? {
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.allowsMultipleSelection = false
-        panel.prompt = "Load"
-        panel.message = "Choose a folder containing audio files."
-
-        guard panel.runModal() == .OK else { return nil }
-        return panel.url
-    }
-
-    private func ejectCurrentRecord() {
-        stopPlayback(clearSelection: true, withSpinDown: false)
-        resetRecordRotation()
-        albumArtImage = nil
-        playlist = []
-        restingTrackTime = 0
-        clearPendingResumeState()
-        updatePlaylistProgress(allowBackwardJump: true)
-
-        if let activeURL = securityScopedFolderURL {
-            activeURL.stopAccessingSecurityScopedResource()
-            securityScopedFolderURL = nil
-        }
-
-        clearPersistedSessionState()
     }
 
     func togglePlayPause() {
@@ -535,7 +502,7 @@ final class PlaybackController: ObservableObject {
         )
     }
 
-    private func loadPlaylist(from folderURL: URL) async {
+    private func loadPlaylist(from folderURL: URL, startsPlaying: Bool = false) async {
         stopPlayback(clearSelection: true, withSpinDown: false)
         resetRecordRotation()
         albumArtImage = nil
@@ -545,19 +512,26 @@ final class PlaybackController: ObservableObject {
 
         do {
             let tracks = try await loader.loadTracks(from: folderURL)
+            guard !Task.isCancelled else { return }
             playlist = tracks
             currentIndex = tracks.isEmpty ? nil : 0
+            currentAlbumFolderURL = tracks.isEmpty ? nil : folderURL
             updatePlaylistProgress(allowBackwardJump: true)
 
             if let artworkURL = try? loader.loadFirstArtworkURL(from: folderURL) {
                 albumArtImage = NSImage(contentsOf: artworkURL)
             }
             syncMediaRemoteState()
-            persistSessionState()
+            if startsPlaying, !tracks.isEmpty {
+                startTrack(at: 0, preserveMomentum: false)
+            } else {
+                persistSessionState()
+            }
         } catch {
             playlist = []
             currentIndex = nil
             albumArtImage = nil
+            currentAlbumFolderURL = nil
             restingTrackTime = 0
             updatePlaylistProgress(allowBackwardJump: true)
             clearPersistedSessionState()

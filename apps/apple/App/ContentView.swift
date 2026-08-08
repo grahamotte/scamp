@@ -104,11 +104,12 @@ private struct HowToUseSheet: View {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Scamp Micro Deck is designed to feel a bit like using a real vinyl record player.")
 
-                Text("To load your first album, click the \(Image(systemName: "eject.fill")) eject button.")
-                Text("Choose a folder with audio files and album art, and Scamp Micro Deck will start playing from there.")
+                Text("To open your record library, click the \(Image(systemName: "eject.fill")) eject button.")
+                Text("The first time, choose a music folder organized as Artist › Album › songs and cover art.")
+                Text("Choose any cover from the shelf to load it. The library stays open so switching records is quick.")
                 Text("You can also drag a folder straight into the window to load it.")
                 Text("Want a quick test? Use \(Text("Help > Load Demo Album").bold()) to load the bundled sample record.")
-                Text("Want to switch albums? Just press \(Image(systemName: "eject.fill")) again and pick a different folder.")
+                Text("Choose a different cover while music is playing to swap albums and start the new record from the beginning.")
                 Text("You can always come back to this later from \(Text("Help > Scamp Micro Deck Help").bold()).")
             }
             .fixedSize(horizontal: false, vertical: true)
