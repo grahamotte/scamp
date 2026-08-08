@@ -11,6 +11,7 @@ let package = Package(
             exclude: ["Assets.xcassets", "Config", "Resources", "UI"],
             sources: [
                 "Playback/AudioPlayerEngine.swift",
+                "Playback/AlbumLibrary.swift",
                 "Playback/PlaybackController.swift",
                 "Playback/PlaybackMediaRemoteBridge.swift",
                 "Playback/PlaybackTrack.swift",

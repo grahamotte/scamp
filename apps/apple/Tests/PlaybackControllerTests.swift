@@ -12,6 +12,7 @@ final class PlaybackControllerTests: XCTestCase {
         XCTAssertNil(playback.currentTrackDisplayName)
         XCTAssertEqual(playback.trackDurations, [])
         XCTAssertEqual(playback.recordRotationDegrees(), 0)
+        XCTAssertNil(playback.currentAlbumFolderURL)
 
         playback.play(atPlaylistProgress: 0.5)
         playback.seek(toPlaylistProgress: 0.5)
@@ -21,5 +22,14 @@ final class PlaybackControllerTests: XCTestCase {
 
         XCTAssertFalse(playback.isPlaying)
         XCTAssertEqual(playback.playlistProgress, 0)
+    }
+
+    func testLoadAlbumSelectsAlbumImmediately() {
+        let playback = PlaybackController()
+        let albumFolderURL = URL(fileURLWithPath: "/tmp/album", isDirectory: true)
+
+        playback.loadAlbum(from: albumFolderURL)
+
+        XCTAssertEqual(playback.currentAlbumFolderURL, albumFolderURL)
     }
 }

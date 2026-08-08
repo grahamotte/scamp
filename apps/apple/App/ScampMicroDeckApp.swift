@@ -3,6 +3,7 @@ import SwiftUI
 @main
 struct ScampMicroDeckApp: App {
     @StateObject private var playback = PlaybackController()
+    @StateObject private var albumLibrary = AlbumLibraryController()
     @AppStorage("selectedTableTheme") private var selectedTableThemeRawValue = TableTheme.wood.rawValue
     @AppStorage("selectedRecordTheme") private var selectedRecordThemeRawValue = RecordTheme.black.rawValue
     @AppStorage("selectedControlsTheme") private var selectedControlsThemeRawValue = ControlsTheme.silver.rawValue
@@ -59,7 +60,21 @@ struct ScampMicroDeckApp: App {
                 controlsTheme: selectedControlsTheme,
                 showsHowToUse: $showsHowToUse
             )
+            LibraryCommands(library: albumLibrary, playback: playback)
         }
+
+        Window("Record Library", id: AlbumLibraryView.windowID) {
+            AlbumLibraryView(
+                library: albumLibrary,
+                playback: playback
+            )
+        }
+        .defaultSize(
+            width: ScampMicroDeckLayout.libraryWindowWidth,
+            height: ScampMicroDeckLayout.libraryWindowHeight
+        )
+        .windowResizability(.contentSize)
+        .windowStyle(.hiddenTitleBar)
 
         Window("About Scamp Micro Deck", id: AboutScampMicroDeckView.windowID) {
             AboutScampMicroDeckView()
