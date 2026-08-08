@@ -367,7 +367,7 @@ private struct AlbumShelfLedge: View {
                         .opacity(0.42)
 
                     AlbumShelfTopShape()
-                        .stroke(Color.white.opacity(0.58), lineWidth: 1)
+                        .stroke(Color(red: 0.93, green: 0.66, blue: 0.32).opacity(0.82), lineWidth: 1)
                 }
                 .frame(height: 22)
 
