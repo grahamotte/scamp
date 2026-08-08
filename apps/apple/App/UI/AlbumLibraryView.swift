@@ -540,6 +540,7 @@ private struct AlbumShelfCard: View, Equatable {
                         .padding(.bottom, 5)
                     }
                 }
+                .opacity(isHovered ? 1 : 0)
 
             }
             .frame(width: size, height: size)
