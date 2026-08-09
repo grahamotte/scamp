@@ -79,7 +79,7 @@ struct ContentView: View {
 #Preview {
     ContentView(
         playback: PlaybackController(),
-        tableTheme: .constant(.wood),
+        tableTheme: .constant(.walnut),
         recordTheme: .constant(.black),
         controlsTheme: .constant(.silver),
         showsHowToUse: .constant(true),

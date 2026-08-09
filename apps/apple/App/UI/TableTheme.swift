@@ -7,6 +7,7 @@ protocol TableThemeDefinition {
 }
 
 enum TableTheme: String, CaseIterable, Identifiable {
+    case walnut
     case wood
     case frostedGlass
     case rainbow
@@ -17,6 +18,8 @@ enum TableTheme: String, CaseIterable, Identifiable {
 
     private var definition: any TableThemeDefinition.Type {
         switch self {
+        case .walnut:
+            return WalnutTableTheme.self
         case .wood:
             return WoodTableTheme.self
         case .frostedGlass:
