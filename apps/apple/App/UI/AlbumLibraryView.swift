@@ -85,19 +85,7 @@ struct AlbumLibraryView: View {
                     let albumIndex = (rowIndex * columns) + columnIndex
                     if library.albums.indices.contains(albumIndex) {
                         let album = library.albums[albumIndex]
-                        if playback.currentAlbumFolderURL?.standardizedFileURL == album.folderURL.standardizedFileURL {
-                            albumSlotPlaceholder
-                        } else {
-                            AlbumShelfCard(
-                                album: album,
-                                size: albumSize,
-                                onSelect: {
-                                    library.recordAlbumLoad(album)
-                                    playback.loadAlbum(from: album.folderURL)
-                                }
-                            )
-                            .equatable()
-                        }
+                        albumSlot(album)
                     } else {
                         albumSlotPlaceholder
                     }
@@ -112,6 +100,27 @@ struct AlbumLibraryView: View {
     private var albumSlotPlaceholder: some View {
         Color.clear
             .frame(width: albumSize, height: albumSize)
+    }
+
+    private func albumSlot(_ album: LibraryAlbum) -> some View {
+        ZStack {
+            if let easterEgg = album.shelfEasterEgg {
+                AlbumShelfEasterEggView(easterEgg: easterEgg)
+            }
+
+            if playback.currentAlbumFolderURL?.standardizedFileURL != album.folderURL.standardizedFileURL {
+                AlbumShelfCard(
+                    album: album,
+                    size: albumSize,
+                    onSelect: {
+                        library.recordAlbumLoad(album)
+                        playback.loadAlbum(from: album.folderURL)
+                    }
+                )
+                .equatable()
+            }
+        }
+        .frame(width: albumSize, height: albumSize)
     }
 
     private var firstRunView: some View {
@@ -602,6 +611,45 @@ private struct AlbumShelfCard: View, Equatable {
                     .foregroundStyle(.white.opacity(0.9))
             }
         }
+    }
+}
+
+private struct AlbumShelfEasterEggView: View {
+    let easterEgg: AlbumShelfEasterEgg
+
+    var body: some View {
+        switch easterEgg {
+        case .doubleXTattooSketch:
+            DoubleXTattooScratchSketch()
+                .padding(.horizontal, 30)
+                .padding(.vertical, 8)
+                .rotationEffect(.degrees(4))
+        case .sunglassesSketch:
+            SunglassesScratchSketch()
+                .padding(.horizontal, 7)
+                .padding(.vertical, 28)
+                .rotationEffect(.degrees(-7))
+        }
+    }
+}
+
+private struct DoubleXTattooScratchSketch: View {
+    var body: some View {
+        Image("ShelfDoubleXTattooEasterEgg")
+            .resizable()
+            .scaledToFit()
+            .opacity(0.82)
+            .allowsHitTesting(false)
+    }
+}
+
+private struct SunglassesScratchSketch: View {
+    var body: some View {
+        Image("ShelfSunglassesEasterEgg")
+            .resizable()
+            .scaledToFit()
+            .opacity(0.82)
+            .allowsHitTesting(false)
     }
 }
 
