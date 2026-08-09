@@ -1,5 +1,5 @@
 {
-  "build": "1.6.1",
+  "build": "1.7.0",
   "contactEmail": "graham.otte@gmail.com",
   "contactFirstName": "Graham",
   "contactLastName": "Otte",
@@ -48,6 +48,6 @@
     },
     "android": {}
   },
-  "version": "1.6.1",
-  "whatsNew": "Browse your music collection on a persistent album shelf, sort albums by artist, title, or most played, and switch records with a click."
+  "version": "1.7.0",
+  "whatsNew": "Browse your collection on a persistent album shelf, sort by artist, album, or most played, switch records with a click, enjoy naturally worn cover art, and personalize your deck with new walnut and black marble themes."
 }
