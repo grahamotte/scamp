@@ -4,7 +4,7 @@ import SwiftUI
 struct ScampMicroDeckApp: App {
     @StateObject private var playback = PlaybackController()
     @StateObject private var albumLibrary = AlbumLibraryController()
-    @AppStorage("selectedTableTheme") private var selectedTableThemeRawValue = TableTheme.wood.rawValue
+    @AppStorage("selectedTableTheme") private var selectedTableThemeRawValue = TableTheme.walnut.rawValue
     @AppStorage("selectedRecordTheme") private var selectedRecordThemeRawValue = RecordTheme.black.rawValue
     @AppStorage("selectedControlsTheme") private var selectedControlsThemeRawValue = ControlsTheme.silver.rawValue
     @AppStorage("hasSeenHowToUse") private var hasSeenHowToUse = false
@@ -12,7 +12,7 @@ struct ScampMicroDeckApp: App {
 
     private var selectedTableTheme: Binding<TableTheme> {
         Binding(
-            get: { TableTheme(rawValue: selectedTableThemeRawValue) ?? .wood },
+            get: { TableTheme(rawValue: selectedTableThemeRawValue) ?? .walnut },
             set: { selectedTableThemeRawValue = $0.rawValue }
         )
     }
