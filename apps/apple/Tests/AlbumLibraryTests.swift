@@ -3,6 +3,45 @@ import XCTest
 @testable import App
 
 final class AlbumLibraryTests: XCTestCase {
+    func testAssignsShelfEasterEggsByArtist() {
+        let capitalCitiesAlbum = LibraryAlbum(
+            artist: "Capital Cities",
+            title: "In a Tidal Wave of Mystery",
+            folderURL: URL(fileURLWithPath: "/music/Capital Cities/In a Tidal Wave of Mystery"),
+            artworkURL: nil
+        )
+        let differentlyCasedAlbum = LibraryAlbum(
+            artist: "CAPITAL CITIES",
+            title: "Kangaroo Court",
+            folderURL: URL(fileURLWithPath: "/music/Capital Cities/Kangaroo Court"),
+            artworkURL: nil
+        )
+        let machineGunKellyAlbum = LibraryAlbum(
+            artist: "Machine Gun Kelly",
+            title: "Tickets to My Downfall",
+            folderURL: URL(fileURLWithPath: "/music/Machine Gun Kelly/Tickets to My Downfall"),
+            artworkURL: nil
+        )
+        let mgkAlbum = LibraryAlbum(
+            artist: "MGK",
+            title: "Mainstream Sellout",
+            folderURL: URL(fileURLWithPath: "/music/MGK/Mainstream Sellout"),
+            artworkURL: nil
+        )
+        let otherAlbum = LibraryAlbum(
+            artist: "Other Artist",
+            title: "Other Album",
+            folderURL: URL(fileURLWithPath: "/music/Other Artist/Other Album"),
+            artworkURL: nil
+        )
+
+        XCTAssertEqual(capitalCitiesAlbum.shelfEasterEgg, .sunglassesSketch)
+        XCTAssertEqual(differentlyCasedAlbum.shelfEasterEgg, .sunglassesSketch)
+        XCTAssertEqual(machineGunKellyAlbum.shelfEasterEgg, .doubleXTattooSketch)
+        XCTAssertEqual(mgkAlbum.shelfEasterEgg, .doubleXTattooSketch)
+        XCTAssertNil(otherAlbum.shelfEasterEgg)
+    }
+
     func testDiscoversAlbumsInArtistAlbumFolders() async throws {
         let root = temporaryFolder()
         defer { try? FileManager.default.removeItem(at: root) }
