@@ -11,6 +11,25 @@ struct LibraryAlbum: Identifiable, Hashable, Sendable {
     var id: String {
         folderURL.standardizedFileURL.path
     }
+
+    var shelfEasterEgg: AlbumShelfEasterEgg? {
+        AlbumShelfEasterEgg.forArtist(artist)
+    }
+}
+
+enum AlbumShelfEasterEgg: Equatable, Sendable {
+    case doubleXTattooSketch
+    case sunglassesSketch
+
+    private static let artists: [String: Self] = [
+        "capital cities": .sunglassesSketch,
+        "machine gun kelly": .doubleXTattooSketch,
+        "mgk": .doubleXTattooSketch,
+    ]
+
+    static func forArtist(_ artist: String) -> Self? {
+        artists[artist.lowercased(with: Locale(identifier: "en_US_POSIX"))]
+    }
 }
 
 enum AlbumLibrarySort: String, CaseIterable, Identifiable, Sendable {
