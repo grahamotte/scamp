@@ -32,4 +32,33 @@ final class PlaybackControllerTests: XCTestCase {
 
         XCTAssertEqual(playback.currentAlbumFolderURL, albumFolderURL)
     }
+
+    func testStageDemoAlbumReplacesPreviouslyStagedFiles() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let resourcesURL = root.appendingPathComponent("Resources", isDirectory: true)
+        let demoAlbumURL = root.appendingPathComponent("Demo Album", isDirectory: true)
+        try FileManager.default.createDirectory(at: resourcesURL, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: demoAlbumURL, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        try Data("new cover".utf8).write(to: resourcesURL.appendingPathComponent("cover.jpg"))
+        try Data("old cover".utf8).write(to: demoAlbumURL.appendingPathComponent("cover.jpg"))
+        try Data("stale art".utf8).write(to: demoAlbumURL.appendingPathComponent("artwork.png"))
+
+        try PlaybackController.stageDemoAlbum(
+            filenames: ["cover.jpg"],
+            from: resourcesURL,
+            to: demoAlbumURL,
+        )
+
+        XCTAssertEqual(
+            try Data(contentsOf: demoAlbumURL.appendingPathComponent("cover.jpg")),
+            Data("new cover".utf8),
+        )
+        XCTAssertFalse(
+            FileManager.default.fileExists(
+                atPath: demoAlbumURL.appendingPathComponent("artwork.png").path,
+            ),
+        )
+    }
 }

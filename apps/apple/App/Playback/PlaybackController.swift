@@ -9,7 +9,7 @@ final class PlaybackController: ObservableObject {
         "ISTANBUL (Not Constantinople) - FRANKIE VAUGHAN.mp3",
         "Mr. Sandman - The Chordettes - Archie Bleyer.mp3",
         "Smoke on the Water - Pancho Baird - Pancho Bairds Gitfiddlers-restored.mp3",
-        "cover.jpg"
+        "cover.jpg",
     ]
 
     @Published private(set) var playlist: [PlaybackTrack] = []
@@ -294,23 +294,11 @@ final class PlaybackController: ObservableObject {
             .appendingPathComponent("Demo Album", isDirectory: true)
 
         do {
-            try FileManager.default.createDirectory(
-                at: demoAlbumURL,
-                withIntermediateDirectories: true,
-                attributes: nil
+            try Self.stageDemoAlbum(
+                filenames: Self.demoAlbumFilenames,
+                from: resourcesURL,
+                to: demoAlbumURL,
             )
-
-            for filename in Self.demoAlbumFilenames {
-                let bundledFileURL = resourcesURL.appendingPathComponent(filename)
-                guard FileManager.default.fileExists(atPath: bundledFileURL.path) else {
-                    return
-                }
-
-                let stagedFileURL = demoAlbumURL.appendingPathComponent(filename)
-                if !FileManager.default.fileExists(atPath: stagedFileURL.path) {
-                    try FileManager.default.copyItem(at: bundledFileURL, to: stagedFileURL)
-                }
-            }
 
             playlistLoadTask?.cancel()
             playlistLoadTask = Task { @MainActor [weak self] in
@@ -318,6 +306,33 @@ final class PlaybackController: ObservableObject {
             }
         } catch {
             return
+        }
+    }
+
+    static func stageDemoAlbum(
+        filenames: [String],
+        from resourcesURL: URL,
+        to demoAlbumURL: URL,
+    ) throws {
+        let bundledFileURLs = filenames.map(resourcesURL.appendingPathComponent)
+        guard bundledFileURLs.allSatisfy({ FileManager.default.fileExists(atPath: $0.path) }) else {
+            throw CocoaError(.fileNoSuchFile)
+        }
+
+        if FileManager.default.fileExists(atPath: demoAlbumURL.path) {
+            try FileManager.default.removeItem(at: demoAlbumURL)
+        }
+        try FileManager.default.createDirectory(
+            at: demoAlbumURL,
+            withIntermediateDirectories: true,
+            attributes: nil,
+        )
+
+        for bundledFileURL in bundledFileURLs {
+            try FileManager.default.copyItem(
+                at: bundledFileURL,
+                to: demoAlbumURL.appendingPathComponent(bundledFileURL.lastPathComponent),
+            )
         }
     }
 
