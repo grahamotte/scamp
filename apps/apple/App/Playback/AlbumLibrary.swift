@@ -184,6 +184,7 @@ final class AlbumLibraryController: ObservableObject {
     private static let bookmarkDefaultsKey = "albumLibrary.rootBookmark.v1"
     private static let albumLoadCountsDefaultsKey = "albumLibrary.albumLoadCounts.v1"
     private static let albumAddedDatesDefaultsKey = "albumLibrary.albumAddedDates.v1"
+    private static let sortOrderDefaultsKey = "albumLibrary.sortOrder.v1"
 
     @Published private(set) var albums: [LibraryAlbum] = []
     @Published private(set) var musicFolderURL: URL?
@@ -208,6 +209,8 @@ final class AlbumLibraryController: ObservableObject {
         self.defaults = defaults
         self.scanner = scanner
         self.currentDate = currentDate
+        sortOrder = defaults.string(forKey: Self.sortOrderDefaultsKey)
+            .flatMap(AlbumLibrarySort.init(rawValue:)) ?? .artistThenAlbum
         albumLoadCounts = defaults.data(forKey: Self.albumLoadCountsDefaultsKey)
             .flatMap { try? JSONDecoder().decode([String: Int].self, from: $0) } ?? [:]
         if
@@ -272,6 +275,7 @@ final class AlbumLibraryController: ObservableObject {
 
     func setSortOrder(_ sortOrder: AlbumLibrarySort) {
         self.sortOrder = sortOrder
+        defaults.set(sortOrder.rawValue, forKey: Self.sortOrderDefaultsKey)
         albums.sort(by: compareAlbums)
     }
 

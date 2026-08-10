@@ -127,6 +127,20 @@ final class AlbumLibraryTests: XCTestCase {
     }
 
     @MainActor
+    func testControllerRestoresSelectedSortOrder() throws {
+        let defaultsName = "AlbumLibraryTests-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: defaultsName))
+        defer { defaults.removePersistentDomain(forName: defaultsName) }
+        let library = AlbumLibraryController(defaults: defaults)
+
+        library.setSortOrder(.recentlyAdded)
+
+        let restoredLibrary = AlbumLibraryController(defaults: defaults)
+
+        XCTAssertEqual(restoredLibrary.sortOrder, .recentlyAdded)
+    }
+
+    @MainActor
     func testControllerSortsMostPlayedAlbumsAndPersistsLoadCounts() async throws {
         let root = temporaryFolder()
         let defaultsName = "AlbumLibraryTests-\(UUID().uuidString)"
