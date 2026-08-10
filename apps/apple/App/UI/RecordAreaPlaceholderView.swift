@@ -8,7 +8,6 @@ struct RecordAreaPlaceholderView: View, Equatable {
     private let hasPlaylist: Bool
     private let albumArtImage: NSImage?
     private let albumArtIdentifier: ObjectIdentifier?
-    private let currentTrackDisplayName: String?
     private let trackDurations: [TimeInterval]
 
     private let layout = VinylRecordLayout()
@@ -24,7 +23,6 @@ struct RecordAreaPlaceholderView: View, Equatable {
         hasPlaylist = playback.hasPlaylist
         albumArtImage = playback.albumArtImage
         albumArtIdentifier = playback.albumArtImage.map(ObjectIdentifier.init)
-        currentTrackDisplayName = playback.currentTrackDisplayName
         trackDurations = playback.trackDurations
     }
 
@@ -35,8 +33,7 @@ struct RecordAreaPlaceholderView: View, Equatable {
             lhs.turntableSpeed == rhs.turntableSpeed &&
             lhs.hasPlaylist == rhs.hasPlaylist &&
             lhs.albumArtIdentifier == rhs.albumArtIdentifier &&
-            lhs.trackDurations == rhs.trackDurations &&
-            (lhs.albumArtIdentifier != nil || lhs.currentTrackDisplayName == rhs.currentTrackDisplayName)
+            lhs.trackDurations == rhs.trackDurations
     }
 
     var body: some View {
@@ -92,8 +89,7 @@ struct RecordAreaPlaceholderView: View, Equatable {
                 size: size,
                 geometry: geometry,
                 trackDivisionRadii: trackDivisionRadii,
-                albumArtImage: albumArtImage,
-                currentTrackDisplayName: currentTrackDisplayName
+                albumArtImage: albumArtImage
             )
         } else {
             ZStack {
@@ -169,39 +165,13 @@ struct RecordAreaPlaceholderView: View, Equatable {
                     height: (geometry.labelRadius + (geometry.innerBufferWidth / 2)) * 2
                 )
 
-            Circle()
-                .fill(palette.backgroundColor)
-                .overlay {
-                    LinearGradient(
-                        colors: [Color.white.opacity(0.01), Color.black.opacity(0.04)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                }
-                .clipShape(Circle())
-                .frame(width: geometry.labelRadius * 2, height: geometry.labelRadius * 2)
-                .overlay {
-                    if albumArtImage == nil {
-                        Circle()
-                            .stroke(palette.trackDividerColor.opacity(0.72), lineWidth: max(1, size * 0.0025))
-                    }
-                }
-                .overlay {
-                    if let albumArtImage {
-                        Image(nsImage: albumArtImage)
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: geometry.labelRadius * 2, height: geometry.labelRadius * 2)
-                            .clipShape(Circle())
-                    } else {
-                        Text(currentTrackDisplayName ?? "SCAMP")
-                            .font(.system(size: max(11, size * 0.028), weight: .semibold, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.88))
-                            .multilineTextAlignment(.center)
-                            .lineLimit(2)
-                            .padding(size * 0.04)
-                    }
-                }
+            if let albumArtImage {
+                Image(nsImage: albumArtImage)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: geometry.labelRadius * 2, height: geometry.labelRadius * 2)
+                    .clipShape(Circle())
+            }
             }
         }
     }
@@ -309,7 +279,6 @@ struct RecordAreaPlaceholderView: View, Equatable {
             theme: theme,
             hasPlaylist: hasPlaylist,
             albumArtIdentifier: albumArtIdentifier,
-            currentTrackDisplayName: currentTrackDisplayName,
             trackDurations: trackDurations
         )
     }
@@ -321,7 +290,6 @@ private struct RecordSurfaceCacheKey: Hashable {
     let theme: RecordTheme
     let hasPlaylist: Bool
     let albumArtIdentifier: ObjectIdentifier?
-    let currentTrackDisplayName: String?
     let trackDurations: [TimeInterval]
 }
 
