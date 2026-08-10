@@ -7,6 +7,21 @@ struct LibraryAlbum: Identifiable, Hashable, Sendable {
     let title: String
     let folderURL: URL
     let artworkURL: URL?
+    let filesystemAddedDate: Date
+
+    init(
+        artist: String,
+        title: String,
+        folderURL: URL,
+        artworkURL: URL?,
+        filesystemAddedDate: Date = .distantPast
+    ) {
+        self.artist = artist
+        self.title = title
+        self.folderURL = folderURL
+        self.artworkURL = artworkURL
+        self.filesystemAddedDate = filesystemAddedDate
+    }
 
     var id: String {
         folderURL.standardizedFileURL.path
@@ -36,6 +51,7 @@ enum AlbumLibrarySort: String, CaseIterable, Identifiable, Sendable {
     case artistThenAlbum
     case album
     case mostPlayed
+    case recentlyAdded
 
     var id: Self {
         self
@@ -49,6 +65,8 @@ enum AlbumLibrarySort: String, CaseIterable, Identifiable, Sendable {
             "Album"
         case .mostPlayed:
             "Most Played"
+        case .recentlyAdded:
+            "Recently Added"
         }
     }
 }
@@ -74,7 +92,11 @@ struct AlbumLibraryScanner: Sendable {
                         artist: artistURL.lastPathComponent,
                         title: albumURL.lastPathComponent,
                         folderURL: albumURL,
-                        artworkURL: mediaURLs.filter(isImageFile).sorted(by: compareArtwork).first
+                        artworkURL: mediaURLs.filter(isImageFile).sorted(by: compareArtwork).first,
+                        filesystemAddedDate: filesystemAddedDate(
+                            for: albumURL,
+                            audioURLs: mediaURLs.filter(isAudioFile)
+                        )
                     )
                 )
             }
@@ -126,6 +148,19 @@ struct AlbumLibraryScanner: Sendable {
         try? url.resourceValues(forKeys: [.contentTypeKey]).contentType
     }
 
+    private func filesystemAddedDate(for albumURL: URL, audioURLs: [URL]) -> Date {
+        if let modificationDate = try? albumURL.resourceValues(
+            forKeys: [.contentModificationDateKey]
+        ).contentModificationDate {
+            return modificationDate
+        }
+
+        let firstAudioURL = audioURLs.sorted(by: compareFilenames).first
+        return firstAudioURL.flatMap {
+            try? $0.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
+        } ?? .distantPast
+    }
+
     private func compareFilenames(_ left: URL, _ right: URL) -> Bool {
         left.lastPathComponent.localizedCaseInsensitiveCompare(right.lastPathComponent) == .orderedAscending
     }
@@ -148,6 +183,7 @@ struct AlbumLibraryScanner: Sendable {
 final class AlbumLibraryController: ObservableObject {
     private static let bookmarkDefaultsKey = "albumLibrary.rootBookmark.v1"
     private static let albumLoadCountsDefaultsKey = "albumLibrary.albumLoadCounts.v1"
+    private static let albumAddedDatesDefaultsKey = "albumLibrary.albumAddedDates.v1"
 
     @Published private(set) var albums: [LibraryAlbum] = []
     @Published private(set) var musicFolderURL: URL?
@@ -157,18 +193,33 @@ final class AlbumLibraryController: ObservableObject {
 
     private let defaults: UserDefaults
     private let scanner: AlbumLibraryScanner
+    private let currentDate: () -> Date
     private var albumLoadCounts: [String: Int]
+    private var albumAddedDates: [String: Date]
+    private var hasAlbumAddedDateHistory: Bool
     private var securityScopedFolderURL: URL?
     private var hasAttemptedRestore = false
 
     init(
         defaults: UserDefaults = .standard,
-        scanner: AlbumLibraryScanner = AlbumLibraryScanner()
+        scanner: AlbumLibraryScanner = AlbumLibraryScanner(),
+        currentDate: @escaping () -> Date = Date.init
     ) {
         self.defaults = defaults
         self.scanner = scanner
+        self.currentDate = currentDate
         albumLoadCounts = defaults.data(forKey: Self.albumLoadCountsDefaultsKey)
             .flatMap { try? JSONDecoder().decode([String: Int].self, from: $0) } ?? [:]
+        if
+            let data = defaults.data(forKey: Self.albumAddedDatesDefaultsKey),
+            let persistedAlbumAddedDates = try? JSONDecoder().decode([String: Date].self, from: data)
+        {
+            albumAddedDates = persistedAlbumAddedDates
+            hasAlbumAddedDateHistory = true
+        } else {
+            albumAddedDates = [:]
+            hasAlbumAddedDateHistory = false
+        }
     }
 
     deinit {
@@ -241,9 +292,12 @@ final class AlbumLibraryController: ObservableObject {
         isLoading = false
         errorMessage = nil
         albumLoadCounts = [:]
+        albumAddedDates = [:]
+        hasAlbumAddedDateHistory = false
         hasAttemptedRestore = true
         defaults.removeObject(forKey: Self.bookmarkDefaultsKey)
         defaults.removeObject(forKey: Self.albumLoadCountsDefaultsKey)
+        defaults.removeObject(forKey: Self.albumAddedDatesDefaultsKey)
     }
 
     func loadLibrary(at folderURL: URL, persistsBookmark: Bool) async {
@@ -259,6 +313,7 @@ final class AlbumLibraryController: ObservableObject {
 
         do {
             albums = try await scanner.loadAlbums(from: folderURL)
+            trackAlbumAddedDates()
             albums.sort(by: compareAlbums)
         } catch {
             albums = []
@@ -289,6 +344,16 @@ final class AlbumLibraryController: ObservableObject {
 
             firstComparison = left.title.localizedCaseInsensitiveCompare(right.title)
             secondComparison = left.artist.localizedCaseInsensitiveCompare(right.artist)
+        case .recentlyAdded:
+            let leftDate = albumAddedDates[left.id] ?? left.filesystemAddedDate
+            let rightDate = albumAddedDates[right.id] ?? right.filesystemAddedDate
+
+            if leftDate != rightDate {
+                return leftDate > rightDate
+            }
+
+            firstComparison = left.title.localizedCaseInsensitiveCompare(right.title)
+            secondComparison = left.artist.localizedCaseInsensitiveCompare(right.artist)
         }
 
         if firstComparison != .orderedSame {
@@ -300,6 +365,24 @@ final class AlbumLibraryController: ObservableObject {
     private func persistAlbumLoadCounts() {
         guard let data = try? JSONEncoder().encode(albumLoadCounts) else { return }
         defaults.set(data, forKey: Self.albumLoadCountsDefaultsKey)
+    }
+
+    private func trackAlbumAddedDates() {
+        let discoveryDate = currentDate()
+
+        for album in albums where albumAddedDates[album.id] == nil {
+            albumAddedDates[album.id] = hasAlbumAddedDateHistory
+                ? discoveryDate
+                : album.filesystemAddedDate
+        }
+
+        hasAlbumAddedDateHistory = true
+        persistAlbumAddedDates()
+    }
+
+    private func persistAlbumAddedDates() {
+        guard let data = try? JSONEncoder().encode(albumAddedDates) else { return }
+        defaults.set(data, forKey: Self.albumAddedDatesDefaultsKey)
     }
 
     private func beginSecurityScopedAccess(for folderURL: URL) {

@@ -84,7 +84,7 @@ struct LibraryCommands: Commands {
     private func clearLibraryAndStats() {
         let alert = NSAlert()
         alert.messageText = "Clear Library and Stats?"
-        alert.informativeText = "This will forget the selected music folder and permanently reset all play counts."
+        alert.informativeText = "This will forget the selected music folder and permanently reset all library history and play counts."
         alert.alertStyle = .warning
         alert.addButton(withTitle: "Clear")
         alert.addButton(withTitle: "Cancel")

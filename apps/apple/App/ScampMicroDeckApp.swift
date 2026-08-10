@@ -2,7 +2,7 @@ import SwiftUI
 
 @main
 struct ScampMicroDeckApp: App {
-    @StateObject private var playback = PlaybackController()
+    @State private var playback = PlaybackController()
     @StateObject private var albumLibrary = AlbumLibraryController()
     @AppStorage("selectedTableTheme") private var selectedTableThemeRawValue = TableTheme.walnut.rawValue
     @AppStorage("selectedRecordTheme") private var selectedRecordThemeRawValue = RecordTheme.black.rawValue
