@@ -12,15 +12,13 @@ struct BlackRecordTheme: RecordThemeDefinition {
         size: CGFloat,
         geometry: VinylRecordGeometry,
         trackDivisionRadii: [CGFloat],
-        albumArtImage: NSImage?,
-        currentTrackDisplayName: String?
+        albumArtImage: NSImage?
     ) -> some View {
         BlackLoadedRecordSurface(
             size: size,
             geometry: geometry,
             trackDivisionRadii: trackDivisionRadii,
-            albumArtImage: albumArtImage,
-            currentTrackDisplayName: currentTrackDisplayName
+            albumArtImage: albumArtImage
         )
     }
 
@@ -42,7 +40,6 @@ private struct BlackLoadedRecordSurface: View {
     let geometry: VinylRecordGeometry
     let trackDivisionRadii: [CGFloat]
     let albumArtImage: NSImage?
-    let currentTrackDisplayName: String?
 
     var body: some View {
         ZStack {
@@ -73,39 +70,13 @@ private struct BlackLoadedRecordSurface: View {
 
     @ViewBuilder
     private func label() -> some View {
-        ZStack {
-            Circle()
-                .fill(
-                    RadialGradient(
-                        colors: [
-                            Color(white: 0.15),
-                            Color(white: 0.055),
-                            Color(white: 0.018)
-                        ],
-                        center: .center,
-                        startRadius: size * 0.02,
-                        endRadius: geometry.labelRadius
-                    )
-                )
-                .overlay(Circle().stroke(Color.white.opacity(0.08), lineWidth: max(1, size * 0.0025)))
-                .opacity(albumArtImage == nil ? 1 : 0)
-
-            if let albumArtImage {
-                Image(nsImage: albumArtImage)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: geometry.labelRadius * 2, height: geometry.labelRadius * 2)
-                    .clipShape(Circle())
-            } else {
-                Text(currentTrackDisplayName ?? "SCAMP")
-                    .font(.system(size: max(11, size * 0.028), weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.90))
-                    .multilineTextAlignment(.center)
-                    .lineLimit(2)
-                    .padding(size * 0.04)
-            }
+        if let albumArtImage {
+            Image(nsImage: albumArtImage)
+                .resizable()
+                .scaledToFill()
+                .frame(width: geometry.labelRadius * 2, height: geometry.labelRadius * 2)
+                .clipShape(Circle())
         }
-        .frame(width: geometry.labelRadius * 2, height: geometry.labelRadius * 2)
     }
 }
 
