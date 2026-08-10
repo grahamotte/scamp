@@ -45,15 +45,18 @@ final class AlbumLibraryTests: XCTestCase {
     func testDiscoversAlbumsInArtistAlbumFolders() async throws {
         let root = temporaryFolder()
         defer { try? FileManager.default.removeItem(at: root) }
+        let bSidesURL = root.appendingPathComponent("Beta/B-Sides")
+        let filesystemAddedDate = Date(timeIntervalSince1970: 1_000_000)
 
-        try createFile(at: root.appendingPathComponent("Beta/B-Sides/02.mp3"))
-        try createFile(at: root.appendingPathComponent("Beta/B-Sides/front.png"))
+        try createFile(at: bSidesURL.appendingPathComponent("02.mp3"))
+        try createFile(at: bSidesURL.appendingPathComponent("front.png"))
         try createFile(at: root.appendingPathComponent("alpha/Zebra/track.mp3"))
         try createFile(at: root.appendingPathComponent("alpha/First/track.m4a"))
         try createFile(at: root.appendingPathComponent("alpha/First/back.jpg"))
         try createFile(at: root.appendingPathComponent("alpha/First/cover.jpg"))
         try createFile(at: root.appendingPathComponent("alpha/Notes/readme.txt"))
         try createFile(at: root.appendingPathComponent("Loose Song.mp3"))
+        try setModificationDate(filesystemAddedDate, at: bSidesURL)
 
         let albums = try await AlbumLibraryScanner().loadAlbums(from: root)
 
@@ -61,6 +64,7 @@ final class AlbumLibraryTests: XCTestCase {
         XCTAssertEqual(albums.map(\.title), ["First", "Zebra", "B-Sides"])
         XCTAssertEqual(albums.map { $0.artworkURL?.lastPathComponent }, ["cover.jpg", nil, "front.png"])
         XCTAssertEqual(Set(albums.map(\.id)).count, 3)
+        XCTAssertEqual(albums.last?.filesystemAddedDate, filesystemAddedDate)
     }
 
     @MainActor
@@ -160,6 +164,45 @@ final class AlbumLibraryTests: XCTestCase {
     }
 
     @MainActor
+    func testControllerSortsRecentlyAddedAlbumsAndTracksNewDiscoveries() async throws {
+        let root = temporaryFolder()
+        let defaultsName = "AlbumLibraryTests-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: defaultsName))
+        defer {
+            defaults.removePersistentDomain(forName: defaultsName)
+            try? FileManager.default.removeItem(at: root)
+        }
+
+        let alphaURL = root.appendingPathComponent("Artist/Alpha")
+        let bravoURL = root.appendingPathComponent("Artist/Bravo")
+        try createFile(at: alphaURL.appendingPathComponent("track.mp3"))
+        try createFile(at: bravoURL.appendingPathComponent("track.mp3"))
+        try setModificationDate(Date(timeIntervalSince1970: 100), at: alphaURL)
+        try setModificationDate(Date(timeIntervalSince1970: 200), at: bravoURL)
+        var discoveryDate = Date(timeIntervalSince1970: 300)
+        let library = AlbumLibraryController(defaults: defaults, currentDate: { discoveryDate })
+
+        await library.loadLibrary(at: root, persistsBookmark: false)
+        library.setSortOrder(.recentlyAdded)
+
+        XCTAssertEqual(library.albums.map(\.title), ["Bravo", "Alpha"])
+
+        let charlieURL = root.appendingPathComponent("Artist/Charlie")
+        try createFile(at: charlieURL.appendingPathComponent("track.mp3"))
+        try setModificationDate(Date(timeIntervalSince1970: 50), at: charlieURL)
+        await library.refreshLibrary()
+
+        XCTAssertEqual(library.albums.map(\.title), ["Charlie", "Bravo", "Alpha"])
+
+        discoveryDate = Date(timeIntervalSince1970: 400)
+        let restoredLibrary = AlbumLibraryController(defaults: defaults, currentDate: { discoveryDate })
+        await restoredLibrary.loadLibrary(at: root, persistsBookmark: false)
+        restoredLibrary.setSortOrder(.recentlyAdded)
+
+        XCTAssertEqual(restoredLibrary.albums.map(\.title), ["Charlie", "Bravo", "Alpha"])
+    }
+
+    @MainActor
     func testControllerClearsLibraryBookmarkAndLoadCounts() async throws {
         let root = temporaryFolder()
         let defaultsName = "AlbumLibraryTests-\(UUID().uuidString)"
@@ -187,6 +230,7 @@ final class AlbumLibraryTests: XCTestCase {
         XCTAssertNil(library.errorMessage)
         XCTAssertNil(defaults.data(forKey: "albumLibrary.rootBookmark.v1"))
         XCTAssertNil(defaults.data(forKey: "albumLibrary.albumLoadCounts.v1"))
+        XCTAssertNil(defaults.data(forKey: "albumLibrary.albumAddedDates.v1"))
 
         let restoredLibrary = AlbumLibraryController(defaults: defaults)
         await restoredLibrary.loadLibrary(at: root, persistsBookmark: false)
@@ -205,5 +249,9 @@ final class AlbumLibraryTests: XCTestCase {
             withIntermediateDirectories: true
         )
         try Data([0]).write(to: url)
+    }
+
+    private func setModificationDate(_ date: Date, at url: URL) throws {
+        try FileManager.default.setAttributes([.modificationDate: date], ofItemAtPath: url.path)
     }
 }
