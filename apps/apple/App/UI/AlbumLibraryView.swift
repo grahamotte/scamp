@@ -3,16 +3,13 @@ import SwiftUI
 
 private enum AlbumLibraryLayout {
     static let scrollContentInset: CGFloat = 20
-    static let titlebarHeight: CGFloat = 42
 }
 
 struct AlbumLibraryView: View {
-    static let windowID = "album-library"
-
     @ObservedObject var library: AlbumLibraryController
     @ObservedObject var playback: PlaybackController
 
-    private let columns = 4
+    private let columns = 3
     private let minimumRows = 6
     private let albumSize: CGFloat = 142
     private let rowHeight: CGFloat = 198
@@ -35,9 +32,12 @@ struct AlbumLibraryView: View {
                 errorPlaque(errorMessage)
             }
         }
-        .frame(width: ScampMicroDeckLayout.libraryWindowWidth, height: ScampMicroDeckLayout.libraryWindowHeight)
+        .frame(
+            minWidth: ScampMicroDeckLayout.libraryWindowWidth,
+            maxWidth: ScampMicroDeckLayout.libraryWindowWidth,
+            maxHeight: .infinity
+        )
         .containerBackground(Color(red: 0.68, green: 0.36, blue: 0.12), for: .window)
-        .background(AlbumLibraryWindowConfigurator())
         .task {
             await library.refreshLibrary()
         }
@@ -58,19 +58,6 @@ struct AlbumLibraryView: View {
         }
         .contentMargins(.vertical, AlbumLibraryLayout.scrollContentInset, for: .scrollContent)
         .scrollIndicators(.visible)
-        .mask(alignment: .top) {
-            VStack(spacing: 0) {
-                LinearGradient(
-                    colors: [.clear, .black],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(height: AlbumLibraryLayout.titlebarHeight)
-
-                Rectangle()
-                    .fill(.black)
-            }
-        }
         .ignoresSafeArea(.container, edges: .top)
     }
 
@@ -80,7 +67,7 @@ struct AlbumLibraryView: View {
 
             AlbumShelfLedge()
 
-            HStack(spacing: 34) {
+            HStack(spacing: 26) {
                 ForEach(0..<columns, id: \.self) { columnIndex in
                     let albumIndex = (rowIndex * columns) + columnIndex
                     if library.albums.indices.contains(albumIndex) {
@@ -91,7 +78,7 @@ struct AlbumLibraryView: View {
                     }
                 }
             }
-            .padding(.horizontal, 58)
+            .padding(.horizontal, 32)
             .padding(.bottom, 27)
         }
         .frame(height: rowHeight)
@@ -814,61 +801,5 @@ private struct AlbumCoverWear: View {
             }
         }
         .allowsHitTesting(false)
-    }
-}
-
-private struct AlbumLibraryWindowConfigurator: NSViewRepresentable {
-    final class Coordinator {
-        weak var titlebarDragView: AlbumLibraryTitlebarDragView?
-    }
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator()
-    }
-
-    func makeNSView(context: Context) -> NSView {
-        NSView(frame: .zero)
-    }
-
-    func updateNSView(_ nsView: NSView, context: Context) {
-        DispatchQueue.main.async {
-            guard let window = nsView.window else { return }
-            window.isOpaque = true
-            window.backgroundColor = NSColor(red: 0.68, green: 0.36, blue: 0.12, alpha: 1)
-            window.titleVisibility = .hidden
-            window.titlebarAppearsTransparent = true
-            window.isMovableByWindowBackground = false
-            installTitlebarDragView(in: window, coordinator: context.coordinator)
-        }
-    }
-
-    static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
-        coordinator.titlebarDragView?.removeFromSuperview()
-    }
-
-    private func installTitlebarDragView(in window: NSWindow, coordinator: Coordinator) {
-        guard let contentView = window.contentView, let frameView = contentView.superview else { return }
-
-        let dragView = coordinator.titlebarDragView ?? AlbumLibraryTitlebarDragView(frame: .zero)
-        coordinator.titlebarDragView = dragView
-
-        if dragView.superview !== frameView {
-            dragView.removeFromSuperview()
-            frameView.addSubview(dragView, positioned: .above, relativeTo: contentView)
-        }
-
-        dragView.frame = NSRect(
-            x: 0,
-            y: frameView.bounds.height - AlbumLibraryLayout.titlebarHeight,
-            width: frameView.bounds.width,
-            height: AlbumLibraryLayout.titlebarHeight
-        )
-        dragView.autoresizingMask = [.width, .minYMargin]
-    }
-}
-
-private final class AlbumLibraryTitlebarDragView: NSView {
-    override func mouseDown(with event: NSEvent) {
-        window?.performDrag(with: event)
     }
 }
