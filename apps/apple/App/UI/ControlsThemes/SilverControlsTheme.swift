@@ -297,14 +297,6 @@ struct SilverControlsTheme: ControlsThemeDefinition {
                     action: action
                 )
             },
-            makePreviousButton: { action in
-                SilverTransportButton(
-                    icon: "backward.fill",
-                    diameter: Self.buttonDiameter,
-                    iconSize: Self.buttonIconSize,
-                    action: action
-                )
-            },
             makePlayPauseButton: { action in
                 SilverTransportButton(
                     icon: "playpause.fill",
@@ -313,14 +305,6 @@ struct SilverControlsTheme: ControlsThemeDefinition {
                     action: action
                 )
             },
-            makeNextButton: { action in
-                SilverTransportButton(
-                    icon: "forward.fill",
-                    diameter: Self.buttonDiameter,
-                    iconSize: Self.buttonIconSize,
-                    action: action
-                )
-            }
         )
     )
 }

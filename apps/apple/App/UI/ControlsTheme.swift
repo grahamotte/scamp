@@ -80,27 +80,17 @@ struct ControlsThemeTransportButtons {
     typealias ButtonAction = () -> Void
 
     let makeEjectButton: (_ action: @escaping ButtonAction) -> AnyView
-    let makePreviousButton: (_ action: @escaping ButtonAction) -> AnyView
     let makePlayPauseButton: (_ action: @escaping ButtonAction) -> AnyView
-    let makeNextButton: (_ action: @escaping ButtonAction) -> AnyView
 
-    init<E: View, P: View, T: View, N: View>(
+    init<E: View, T: View>(
         @ViewBuilder makeEjectButton: @escaping (_ action: @escaping ButtonAction) -> E,
-        @ViewBuilder makePreviousButton: @escaping (_ action: @escaping ButtonAction) -> P,
         @ViewBuilder makePlayPauseButton: @escaping (_ action: @escaping ButtonAction) -> T,
-        @ViewBuilder makeNextButton: @escaping (_ action: @escaping ButtonAction) -> N
     ) {
         self.makeEjectButton = { action in
             AnyView(makeEjectButton(action))
         }
-        self.makePreviousButton = { action in
-            AnyView(makePreviousButton(action))
-        }
         self.makePlayPauseButton = { action in
             AnyView(makePlayPauseButton(action))
-        }
-        self.makeNextButton = { action in
-            AnyView(makeNextButton(action))
         }
     }
 }

@@ -229,16 +229,6 @@ struct BlackControlsTheme: ControlsThemeDefinition {
                     action: action
                 )
             },
-            makePreviousButton: { action in
-                BlackTransportButton(
-                    icon: "backward.fill",
-                    buttonWidth: Self.controlButtonWidth,
-                    buttonHeight: Self.controlButtonHeight,
-                    cornerRadius: Self.controlButtonCornerRadius,
-                    iconSize: Self.controlButtonIconSize,
-                    action: action
-                )
-            },
             makePlayPauseButton: { action in
                 BlackTransportButton(
                     icon: "playpause.fill",
@@ -249,16 +239,6 @@ struct BlackControlsTheme: ControlsThemeDefinition {
                     action: action
                 )
             },
-            makeNextButton: { action in
-                BlackTransportButton(
-                    icon: "forward.fill",
-                    buttonWidth: Self.controlButtonWidth,
-                    buttonHeight: Self.controlButtonHeight,
-                    cornerRadius: Self.controlButtonCornerRadius,
-                    iconSize: Self.controlButtonIconSize,
-                    action: action
-                )
-            }
         )
     )
 }

@@ -122,6 +122,39 @@ final class PlaybackController: ObservableObject {
         }
     }
 
+    func playlistProgressSnappedToNearestTrackStart(_ progress: Double) -> Double {
+        Self.playlistProgressSnappedToNearestTrackStart(
+            progress,
+            trackDurations: trackDurations,
+        )
+    }
+
+    static func playlistProgressSnappedToNearestTrackStart(
+        _ progress: Double,
+        trackDurations: [TimeInterval],
+    ) -> Double {
+        let clampedProgress = min(max(progress, 0), 1)
+        let durations = trackDurations.filter { $0.isFinite && $0 > 0 }
+        let totalDuration = durations.reduce(0, +)
+        guard totalDuration > 0 else { return clampedProgress }
+
+        var nearestProgress: Double = 0
+        var nearestDistance = abs(clampedProgress)
+        var elapsed: TimeInterval = 0
+
+        for duration in durations.dropLast() {
+            elapsed += duration
+            let trackStartProgress = elapsed / totalDuration
+            let distance = abs(clampedProgress - trackStartProgress)
+            if distance < nearestDistance {
+                nearestProgress = trackStartProgress
+                nearestDistance = distance
+            }
+        }
+
+        return nearestProgress
+    }
+
     var turntableSpeedPublisher: AnyPublisher<Double, Never> {
         turntableSpeedSubject.eraseToAnyPublisher()
     }

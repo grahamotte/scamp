@@ -33,6 +33,45 @@ final class PlaybackControllerTests: XCTestCase {
         XCTAssertEqual(playback.currentAlbumFolderURL, albumFolderURL)
     }
 
+    func testPlaylistProgressSnapsToNearestTrackStart() {
+        let durations: [TimeInterval] = [10, 30, 60]
+
+        XCTAssertEqual(
+            PlaybackController.playlistProgressSnappedToNearestTrackStart(
+                0.08,
+                trackDurations: durations,
+            ),
+            0.1,
+            accuracy: 0.000_001,
+        )
+        XCTAssertEqual(
+            PlaybackController.playlistProgressSnappedToNearestTrackStart(
+                0.37,
+                trackDurations: durations,
+            ),
+            0.4,
+            accuracy: 0.000_001,
+        )
+        XCTAssertEqual(
+            PlaybackController.playlistProgressSnappedToNearestTrackStart(
+                0.92,
+                trackDurations: durations,
+            ),
+            0.4,
+            accuracy: 0.000_001,
+        )
+    }
+
+    func testPlaylistProgressSnapClampsProgressWithoutTracks() {
+        XCTAssertEqual(
+            PlaybackController.playlistProgressSnappedToNearestTrackStart(
+                1.5,
+                trackDurations: [],
+            ),
+            1,
+        )
+    }
+
     func testStageDemoAlbumReplacesPreviouslyStagedFiles() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let resourcesURL = root.appendingPathComponent("Resources", isDirectory: true)

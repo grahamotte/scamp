@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct DeckWorkspaceView: View {
@@ -76,13 +77,18 @@ struct DeckWorkspaceView: View {
                                 onCounterweightTapped: {
                                     showsTonearmDebugGuides.toggle()
                                 },
-                                onScrubChanged: { progress in
-                                    scrubDragProgress = progress
+                                onScrubChanged: { progress, snapsToTrackStart in
+                                    scrubDragProgress = snapsToTrackStart
+                                        ? playback.playlistProgressSnappedToNearestTrackStart(progress)
+                                        : progress
                                 },
-                                onScrubEnded: { progress in
+                                onScrubEnded: { progress, snapsToTrackStart in
+                                    let resolvedProgress = snapsToTrackStart
+                                        ? playback.playlistProgressSnappedToNearestTrackStart(progress)
+                                        : progress
                                     scrubDragProgress = nil
-                                    playback.seek(toPlaylistProgress: progress)
-                                }
+                                    playback.seek(toPlaylistProgress: resolvedProgress)
+                                },
                             )
                         }
                         .frame(width: geometry.size.width, height: squareSize, alignment: .topLeading)
@@ -140,8 +146,8 @@ private struct TonearmWorkspaceOverlay: View {
     let progress: Double
     let showsDebugGuides: Bool
     let onCounterweightTapped: () -> Void
-    let onScrubChanged: (Double) -> Void
-    let onScrubEnded: (Double) -> Void
+    let onScrubChanged: (Double, Bool) -> Void
+    let onScrubEnded: (Double, Bool) -> Void
 
     private static let scrubGuideAngleDegrees: Double = -33
     private static let scrubCurveDepthFraction: CGFloat = 0.12
@@ -382,17 +388,22 @@ private struct TonearmWorkspaceOverlay: View {
                     for: value.location,
                     start: start,
                     control: control,
-                    end: end
-                ))
+                    end: end,
+                ), snapsToTrackStart)
             }
             .onEnded { value in
                 onScrubEnded(projectedTonearmProgress(
                     for: value.location,
                     start: start,
                     control: control,
-                    end: end
-                ))
+                    end: end,
+                ), snapsToTrackStart)
             }
+    }
+
+    private var snapsToTrackStart: Bool {
+        let modifierFlags = NSEvent.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        return modifierFlags.contains(.shift) || modifierFlags.contains(.command)
     }
 
     private func projectedTonearmProgress(

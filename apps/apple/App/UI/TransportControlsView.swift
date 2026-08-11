@@ -15,19 +15,9 @@ struct TransportControlsView: View {
                 showsLibrary.toggle()
             }
 
-            transportButtons.makePreviousButton {
-                ControlClickSoundPlayer.shared.play()
-                playback.playPrevious()
-            }
-
             transportButtons.makePlayPauseButton {
                 ControlClickSoundPlayer.shared.play()
                 playback.togglePlayPause()
-            }
-
-            transportButtons.makeNextButton {
-                ControlClickSoundPlayer.shared.play()
-                playback.playNext()
             }
         }
     }
