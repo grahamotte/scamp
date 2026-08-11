@@ -1,5 +1,5 @@
 {
-  "build": "1.7.0",
+  "build": "1.8.0",
   "contactEmail": "graham.otte@gmail.com",
   "contactFirstName": "Graham",
   "contactLastName": "Otte",
@@ -48,6 +48,6 @@
     },
     "android": {}
   },
-  "version": "1.7.0",
-  "whatsNew": "Browse your collection on a persistent album shelf, sort by artist, album, or most played, switch records with a click, enjoy naturally worn cover art, and personalize your deck with new walnut and black marble themes."
+  "version": "1.8.0",
+  "whatsNew": "Keep the record library attached to the main window, sort albums by recently added, and preserve your preferred sort between launches. Also includes loading and demo artwork fixes."
 }
