@@ -5,6 +5,7 @@ struct DeckWorkspaceView: View {
     @Binding var tableTheme: TableTheme
     @Binding var recordTheme: RecordTheme
     @Binding var controlsTheme: ControlsTheme
+    @Binding var showsLibrary: Bool
     @State private var scrubDragProgress: Double?
     @State private var showsTonearmDebugGuides = false
     @State private var debugLightSource: CGPoint?
@@ -58,7 +59,8 @@ struct DeckWorkspaceView: View {
                                 height: squareSize,
                                 edgeInset: chromeInset,
                                 controlsTheme: controlsTheme,
-                                playback: playback
+                                playback: playback,
+                                showsLibrary: $showsLibrary
                             )
                             .frame(width: geometry.size.width, height: squareSize, alignment: .topTrailing)
 

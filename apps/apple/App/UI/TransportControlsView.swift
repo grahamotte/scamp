@@ -4,7 +4,7 @@ struct TransportControlsView: View {
     @ObservedObject var playback: PlaybackController
     let controlsTheme: ControlsTheme
     let buttonSpacing: CGFloat
-    @Environment(\.openWindow) private var openWindow
+    @Binding var showsLibrary: Bool
 
     var body: some View {
         let transportButtons = controlsTheme.palette.transportButtons
@@ -12,7 +12,7 @@ struct TransportControlsView: View {
         return HStack(spacing: buttonSpacing) {
             transportButtons.makeEjectButton {
                 ControlClickSoundPlayer.shared.play()
-                openWindow(id: AlbumLibraryView.windowID)
+                showsLibrary.toggle()
             }
 
             transportButtons.makePreviousButton {

@@ -9,6 +9,7 @@ struct ScampMicroDeckApp: App {
     @AppStorage("selectedControlsTheme") private var selectedControlsThemeRawValue = ControlsTheme.silver.rawValue
     @AppStorage("hasSeenHowToUse") private var hasSeenHowToUse = false
     @State private var showsHowToUse = false
+    @State private var showsLibrary = false
 
     private var selectedTableTheme: Binding<TableTheme> {
         Binding(
@@ -35,9 +36,11 @@ struct ScampMicroDeckApp: App {
         WindowGroup {
             ContentView(
                 playback: playback,
+                library: albumLibrary,
                 tableTheme: selectedTableTheme,
                 recordTheme: selectedRecordTheme,
                 controlsTheme: selectedControlsTheme,
+                showsLibrary: $showsLibrary,
                 showsHowToUse: $showsHowToUse,
                 dismissHowToUse: {
                     hasSeenHowToUse = true
@@ -60,21 +63,12 @@ struct ScampMicroDeckApp: App {
                 controlsTheme: selectedControlsTheme,
                 showsHowToUse: $showsHowToUse
             )
-            LibraryCommands(library: albumLibrary, playback: playback)
-        }
-
-        Window("Record Library", id: AlbumLibraryView.windowID) {
-            AlbumLibraryView(
+            LibraryCommands(
                 library: albumLibrary,
-                playback: playback
+                playback: playback,
+                showsLibrary: $showsLibrary
             )
         }
-        .defaultSize(
-            width: ScampMicroDeckLayout.libraryWindowWidth,
-            height: ScampMicroDeckLayout.libraryWindowHeight
-        )
-        .windowResizability(.contentSize)
-        .windowStyle(.hiddenTitleBar)
 
         Window("About Scamp Micro Deck", id: AboutScampMicroDeckView.windowID) {
             AboutScampMicroDeckView()

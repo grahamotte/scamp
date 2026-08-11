@@ -44,6 +44,7 @@ module Apps
       end
 
       def build(target, derived_data_path)
+        FileUtils.rm_rf(product_path(target, derived_data_path))
         Cmd.local(Shellwords.join([
           "xcodebuild",
           "-project",

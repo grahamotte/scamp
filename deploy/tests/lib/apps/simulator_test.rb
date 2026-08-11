@@ -54,12 +54,21 @@ class AppsSimulatorTest < Minitest::Test
     Apps.reset
     Apps.root = File.join(@deploy_test_dir, "apps")
     Apps.tmp_root = File.join(@deploy_test_dir, "artifacts")
+    app_path = File.join(Apps.tmp_root, "simulate", "macos", "Build", "Products", "Debug", "App-macOS.app")
+    FileUtils.mkdir_p(app_path)
+    File.write(File.join(app_path, "stale"), "stale")
     commands = []
-    Cmd.stubs(:local).with { |command| commands << command; true }.returns("")
+    removed_before_build = false
+    Cmd.stubs(:local).with do |command|
+      commands << command
+      removed_before_build = !File.exist?(app_path) if command.include?("xcodebuild")
+      true
+    end.returns("")
 
     [ "mac", "macos", "osx" ].each { |name| Apps::Simulator.call(name) }
 
     assert commands.any? { |command| command.include?("platform\\=macOS") }
+    assert removed_before_build
     assert commands.any? { |command| command == "pkill -x App-macOS" }
     assert commands.any? { |command| command.include?("open") && command.include?("App-macOS.app") }
     refute commands.any? { |command| command.include?("simctl") }

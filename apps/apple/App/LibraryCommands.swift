@@ -4,11 +4,16 @@ import SwiftUI
 struct LibraryCommands: Commands {
     @ObservedObject var library: AlbumLibraryController
     let playback: PlaybackController
-    @Environment(\.dismissWindow) private var dismissWindow
+    @Binding var showsLibrary: Bool
 
-    init(library: AlbumLibraryController, playback: PlaybackController) {
+    init(
+        library: AlbumLibraryController,
+        playback: PlaybackController,
+        showsLibrary: Binding<Bool>
+    ) {
         self.library = library
         self.playback = playback
+        _showsLibrary = showsLibrary
     }
 
     var body: some Commands {
@@ -25,8 +30,9 @@ struct LibraryCommands: Commands {
             }
 
             Button("Close Library") {
-                dismissWindow(id: AlbumLibraryView.windowID)
+                showsLibrary = false
             }
+            .disabled(!showsLibrary)
 
             Divider()
 

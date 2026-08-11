@@ -7,6 +7,7 @@ struct ControlsAreaView: View {
     let controlsTheme: ControlsTheme
 
     @ObservedObject var playback: PlaybackController
+    @Binding var showsLibrary: Bool
 
     var body: some View {
         VStack(spacing: 0) {
@@ -15,7 +16,8 @@ struct ControlsAreaView: View {
             TransportControlsView(
                 playback: playback,
                 controlsTheme: controlsTheme,
-                buttonSpacing: 10
+                buttonSpacing: 10,
+                showsLibrary: $showsLibrary
             )
             .frame(maxWidth: .infinity, alignment: .trailing)
             .padding(.trailing, edgeInset)

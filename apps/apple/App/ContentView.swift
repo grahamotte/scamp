@@ -3,9 +3,11 @@ import UniformTypeIdentifiers
 
 struct ContentView: View {
     @ObservedObject var playback: PlaybackController
+    @ObservedObject var library: AlbumLibraryController
     @Binding var tableTheme: TableTheme
     @Binding var recordTheme: RecordTheme
     @Binding var controlsTheme: ControlsTheme
+    @Binding var showsLibrary: Bool
     @Binding var showsHowToUse: Bool
     let dismissHowToUse: () -> Void
     @State private var columnVisibility: NavigationSplitViewVisibility = .detailOnly
@@ -19,7 +21,8 @@ struct ContentView: View {
                 playback: playback,
                 tableTheme: $tableTheme,
                 recordTheme: $recordTheme,
-                controlsTheme: $controlsTheme
+                controlsTheme: $controlsTheme,
+                showsLibrary: $showsLibrary
             )
         }
         .navigationSplitViewStyle(.balanced)
@@ -27,6 +30,13 @@ struct ContentView: View {
         .toolbar(removing: .sidebarToggle)
         .background(TitlebarSidebarButtonHider())
         .background(ThemeWindowConfigurator())
+        .background(
+            AttachedLibraryPanelPresenter(
+                library: library,
+                playback: playback,
+                isPresented: showsLibrary
+            )
+        )
         .frame(width: ScampMicroDeckLayout.windowWidth, height: ScampMicroDeckLayout.windowHeight)
         .onDrop(of: [UTType.fileURL.identifier], isTargeted: nil, perform: handleFolderDrop(providers:))
         .sheet(isPresented: $showsHowToUse) {
@@ -79,9 +89,11 @@ struct ContentView: View {
 #Preview {
     ContentView(
         playback: PlaybackController(),
+        library: AlbumLibraryController(),
         tableTheme: .constant(.walnut),
         recordTheme: .constant(.black),
         controlsTheme: .constant(.silver),
+        showsLibrary: .constant(false),
         showsHowToUse: .constant(true),
         dismissHowToUse: {}
     )
