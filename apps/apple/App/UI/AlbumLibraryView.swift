@@ -57,7 +57,7 @@ struct AlbumLibraryView: View {
             }
         }
         .contentMargins(.vertical, AlbumLibraryLayout.scrollContentInset, for: .scrollContent)
-        .scrollIndicators(.visible)
+        .scrollIndicators(.hidden)
         .ignoresSafeArea(.container, edges: .top)
     }
 
