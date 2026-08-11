@@ -15,10 +15,12 @@ final class PlaybackController: ObservableObject {
     @Published private(set) var playlist: [PlaybackTrack] = []
     @Published private(set) var currentIndex: Int?
     @Published private(set) var isPlaying = false
-    @Published private(set) var turntableSpeed: Double = 0
+    @Published private(set) var isTurntableMoving = false
     @Published private(set) var albumArtImage: NSImage?
     @Published private(set) var playlistProgress: Double = 0
     @Published private(set) var currentAlbumFolderURL: URL?
+    private(set) var turntableSpeed: Double = 0
+    private let turntableSpeedSubject = CurrentValueSubject<Double, Never>(0)
 
     private static let spinUpDuration: TimeInterval = 1.6
     private static let spinDownDuration: TimeInterval = 2.0
@@ -30,8 +32,8 @@ final class PlaybackController: ObservableObject {
     private static let playbackRateCurveExponent: Double = 1.9
     private static let playbackVolumeCurveExponent: Double = 0.8
     private static let rampFrameNanoseconds: UInt64 = 16_666_667
-    private static let progressFrameNanoseconds: UInt64 = 16_666_667
-    private static let sessionPersistEveryProgressTicks = 60
+    private static let progressFrameNanoseconds: UInt64 = 100_000_000
+    private static let sessionPersistEveryProgressTicks = 10
     private static let movingThreshold: Double = 0.001
     private static let platterRPM: Double = 33
     private static let persistedSessionDefaultsKey = "playback.session.v1"
@@ -118,6 +120,10 @@ final class PlaybackController: ObservableObject {
         playlist.map { track in
             max(track.duration, 1)
         }
+    }
+
+    var turntableSpeedPublisher: AnyPublisher<Double, Never> {
+        turntableSpeedSubject.eraseToAnyPublisher()
     }
 
     func recordRotationDegrees(at now: Date = Date()) -> Double {
@@ -864,6 +870,11 @@ final class PlaybackController: ObservableObject {
 
     private func applyTurntableState() {
         turntableSpeed = effectiveTurntableSpeed
+        turntableSpeedSubject.send(turntableSpeed)
+        let shouldBeMoving = turntableSpeed > Self.movingThreshold
+        if isTurntableMoving != shouldBeMoving {
+            isTurntableMoving = shouldBeMoving
+        }
 
         guard isPlaying, engine.hasLoadedTrack else { return }
         engine.setPlaybackRate(currentPlaybackRate)
@@ -933,10 +944,6 @@ final class PlaybackController: ObservableObject {
 
         let shifted = (-2 * progress) + 2
         return 1 - ((shifted * shifted * shifted) / 2)
-    }
-
-    private var isTurntableMoving: Bool {
-        turntableSpeed > Self.movingThreshold
     }
 
     private var effectiveTurntableSpeed: Double {

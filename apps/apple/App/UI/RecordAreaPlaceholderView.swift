@@ -1,10 +1,11 @@
+import Combine
 import SwiftUI
 
 struct RecordAreaPlaceholderView: View, Equatable {
     let size: CGFloat
     let playback: PlaybackController
     let theme: RecordTheme
-    private let turntableSpeed: Double
+    private let isTurntableMoving: Bool
     private let hasPlaylist: Bool
     private let albumArtImage: NSImage?
     private let albumArtIdentifier: ObjectIdentifier?
@@ -19,7 +20,7 @@ struct RecordAreaPlaceholderView: View, Equatable {
         self.size = size
         self.playback = playback
         self.theme = theme
-        turntableSpeed = playback.turntableSpeed
+        isTurntableMoving = playback.isTurntableMoving
         hasPlaylist = playback.hasPlaylist
         albumArtImage = playback.albumArtImage
         albumArtIdentifier = playback.albumArtImage.map(ObjectIdentifier.init)
@@ -30,7 +31,7 @@ struct RecordAreaPlaceholderView: View, Equatable {
         lhs.size == rhs.size &&
             lhs.playback === rhs.playback &&
             lhs.theme == rhs.theme &&
-            lhs.turntableSpeed == rhs.turntableSpeed &&
+            lhs.isTurntableMoving == rhs.isTurntableMoving &&
             lhs.hasPlaylist == rhs.hasPlaylist &&
             lhs.albumArtIdentifier == rhs.albumArtIdentifier &&
             lhs.trackDurations == rhs.trackDurations
@@ -44,20 +45,14 @@ struct RecordAreaPlaceholderView: View, Equatable {
 
         Group {
             if hasPlaylist {
-                TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: turntableSpeed <= 0.0001)) { context in
-                    let rotationDegrees = playback.recordRotationDegrees(at: context.date)
-
-                    ZStack {
-                        surface
-                            .id(surfaceCacheKey)
-                            .frame(width: size, height: size)
-                            .drawingGroup(opaque: false, colorMode: .linear)
-                            .rotationEffect(.degrees(rotationDegrees))
-                            .transaction { transaction in
-                                transaction.animation = nil
-                            }
-                    }
-                }
+                CompositorRotatingRecordView(
+                    playback: playback,
+                    startingRotationDegrees: playback.recordRotationDegrees(),
+                    cacheKey: surfaceCacheKey,
+                    content: surface
+                        .frame(width: size, height: size)
+                )
+                .id(surfaceCacheKey)
             } else {
                 surface
                     .id(surfaceCacheKey)
@@ -283,6 +278,146 @@ struct RecordAreaPlaceholderView: View, Equatable {
         )
     }
 
+}
+
+private struct CompositorRotatingRecordView<Content: View>: NSViewRepresentable {
+    let playback: PlaybackController
+    let startingRotationDegrees: Double
+    let cacheKey: RecordSurfaceCacheKey
+    let content: Content
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    func makeNSView(context: Context) -> RecordRotationView {
+        let view = RecordRotationView()
+        view.setRootView(
+            content,
+            cacheKey: cacheKey,
+            scale: context.environment.displayScale
+        )
+        view.installRotation(
+            startingDegrees: startingRotationDegrees,
+            speed: playback.turntableSpeed
+        )
+        context.coordinator.bind(to: playback, view: view)
+        return view
+    }
+
+    func updateNSView(_ nsView: RecordRotationView, context: Context) {
+        nsView.setRootView(
+            content,
+            cacheKey: cacheKey,
+            scale: context.environment.displayScale
+        )
+        nsView.setPlaybackSpeed(playback.turntableSpeed)
+    }
+
+    final class Coordinator {
+        private var speedCancellable: AnyCancellable?
+
+        func bind(to playback: PlaybackController, view: RecordRotationView) {
+            speedCancellable = playback.turntableSpeedPublisher
+                .removeDuplicates()
+                .sink { [weak view] speed in
+                    view?.setPlaybackSpeed(speed)
+                }
+        }
+    }
+}
+
+private final class RecordRotationView: NSView {
+    private static let animationKey = "recordRotation"
+    private static let rotationDuration: CFTimeInterval = 60 / 33
+    private let rotationLayer = CALayer()
+    private var playbackSpeed: Double?
+    private var renderedCacheKey: RecordSurfaceCacheKey?
+    private var renderedScale: CGFloat?
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+        rotationLayer.anchorPoint = CGPoint(x: 0.5, y: 0.5)
+        rotationLayer.contentsGravity = .resize
+        layer?.addSublayer(rotationLayer)
+    }
+
+    convenience init() {
+        self.init(frame: .zero)
+    }
+
+    required init?(coder: NSCoder) {
+        nil
+    }
+
+    override func layout() {
+        super.layout()
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        rotationLayer.bounds = CGRect(origin: .zero, size: bounds.size)
+        rotationLayer.position = CGPoint(x: bounds.midX, y: bounds.midY)
+        CATransaction.commit()
+    }
+
+    func setRootView<Content: View>(
+        _ content: Content,
+        cacheKey: RecordSurfaceCacheKey,
+        scale: CGFloat
+    ) {
+        guard renderedCacheKey != cacheKey || renderedScale != scale else { return }
+
+        let renderer = ImageRenderer(content: content)
+        renderer.scale = scale
+        renderer.colorMode = .extendedLinear
+        guard let image = renderer.cgImage else { return }
+
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        rotationLayer.contents = image
+        rotationLayer.contentsScale = scale
+        CATransaction.commit()
+        renderedCacheKey = cacheKey
+        renderedScale = scale
+    }
+
+    func installRotation(startingDegrees: Double, speed: Double) {
+        let normalizedDegrees = startingDegrees.truncatingRemainder(dividingBy: 360)
+        let phase = (normalizedDegrees / 360) * Self.rotationDuration
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        rotationLayer.speed = 0
+        rotationLayer.beginTime = 0
+        rotationLayer.timeOffset = phase
+
+        let animation = CABasicAnimation(keyPath: "transform.rotation.z")
+        animation.fromValue = 0
+        animation.toValue = Double.pi * -2
+        animation.duration = Self.rotationDuration
+        animation.repeatCount = .infinity
+        animation.isRemovedOnCompletion = false
+        rotationLayer.add(animation, forKey: Self.animationKey)
+        CATransaction.commit()
+
+        playbackSpeed = nil
+        setPlaybackSpeed(speed)
+    }
+
+    func setPlaybackSpeed(_ speed: Double) {
+        let clampedSpeed = min(max(speed, 0), 1)
+        guard playbackSpeed != clampedSpeed else { return }
+
+        let mediaTime = CACurrentMediaTime()
+        let localTime = rotationLayer.convertTime(mediaTime, from: nil)
+        let parentTime = rotationLayer.superlayer?.convertTime(mediaTime, from: nil) ?? mediaTime
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        rotationLayer.speed = Float(clampedSpeed)
+        rotationLayer.beginTime = parentTime
+        rotationLayer.timeOffset = localTime
+        CATransaction.commit()
+        playbackSpeed = clampedSpeed
+    }
 }
 
 private struct RecordSurfaceCacheKey: Hashable {
