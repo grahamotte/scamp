@@ -1,5 +1,5 @@
 {
-  "build": "1.8.2",
+  "build": "1.8.3",
   "contactEmail": "graham.otte@gmail.com",
   "contactFirstName": "Graham",
   "contactLastName": "Otte",
@@ -48,6 +48,6 @@
     },
     "android": {}
   },
-  "version": "1.8.2",
-  "whatsNew": "Browse your music on an attached album shelf, sort by artist, album, most played, or recently added, and personalize your deck with walnut and marble themes. Also includes smoother playback, persistent sorting, streamlined controls, worn album art, and loading and demo artwork fixes."
+  "version": "1.8.3",
+  "whatsNew": "Enjoy refined gold, silver, and black hardware finishes, plus a more detailed, tactile black vinyl record."
 }
