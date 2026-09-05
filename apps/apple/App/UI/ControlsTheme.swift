@@ -107,6 +107,7 @@ struct ControlsThemePalette {
 enum ControlsTheme: String, CaseIterable, Identifiable {
     case silver
     case black
+    case gold
 
     var id: String { rawValue }
 
@@ -116,6 +117,8 @@ enum ControlsTheme: String, CaseIterable, Identifiable {
             return SilverControlsTheme.self
         case .black:
             return BlackControlsTheme.self
+        case .gold:
+            return GoldControlsTheme.self
         }
     }
 
