@@ -16,6 +16,7 @@ let package = Package(
                 "Playback/PlaybackMediaRemoteBridge.swift",
                 "Playback/PlaybackTrack.swift",
                 "Playback/PlaylistLoader.swift",
+                "Rendering/BlackRecordPressing.swift",
             ],
             swiftSettings: [.swiftLanguageMode(.v5)],
         ),

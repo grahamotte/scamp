@@ -61,7 +61,7 @@ struct RecordAreaPlaceholderView: View, Equatable {
         }
         .frame(width: size, height: size)
         .overlay {
-            recordLightingOverlay(for: geometry)
+            recordLightingOverlay(for: geometry, trackDivisionRadii: divisionRadii)
         }
         .overlay {
             centerPeg(diameter: centerPegDiameter)
@@ -198,10 +198,14 @@ struct RecordAreaPlaceholderView: View, Equatable {
     }
 
     @ViewBuilder
-    private func recordLightingOverlay(for geometry: VinylRecordGeometry) -> some View {
+    private func recordLightingOverlay(for geometry: VinylRecordGeometry, trackDivisionRadii: [CGFloat]) -> some View {
         if theme == .black {
             if hasPlaylist {
-                BlackRecordTheme.loadedLightingOverlay(size: size, geometry: geometry)
+                BlackRecordTheme.loadedLightingOverlay(
+                    size: size,
+                    geometry: geometry,
+                    trackDivisionRadii: trackDivisionRadii
+                )
             }
         }
     }
